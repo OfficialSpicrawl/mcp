@@ -336,6 +336,13 @@ A stdio-only client runs `npx -y @spicrawl/mcp` with `SPICRAWL_API_KEY` in its e
 | `SPICRAWL_MCP_ADDR` | `127.0.0.1:8090` | HTTP | Listen address, `host:port`. |
 | `SPICRAWL_MCP_SESSION_IDLE_MS` | `1800000` (30 min) | HTTP | Idle MCP sessions are dropped after this long. |
 | `SPICRAWL_MCP_HIDE_UNAVAILABLE` | off | both | `1`, `true`, `yes` or `on` leaves out what is announced but not available yet: `spicrawl_browser_connect_url` is not registered (24 tools) and every argument marked "Coming soon" is dropped from the schemas (`ai_extract`, `stealth`, `extract_preset`, `premium_proxy`, `proxy_country`, `sticky_key`, and the session `rotate_ip`, `region_pool` and `fingerprint`). The `camoufox` engine value stays in the `engine` enums. Read when the server starts a session, so restart the process after changing it. |
+| `SPICRAWL_CHATGPT_ENABLED` | off | HTTP | `1`, `true`, `yes` or `on` turns on the [ChatGPT endpoint](#chatgpt-endpoint-oauth). Off, `/chatgpt/mcp`, its metadata and the OpenAI challenge all answer `404`. |
+| `SPICRAWL_CHATGPT_RESOURCE` | `https://mcp.spicrawl.com/chatgpt/mcp` | HTTP | The OAuth resource identifier. Tokens must be issued for exactly this `aud`; the metadata is published at `/.well-known/oauth-protected-resource` + its path. |
+| `SPICRAWL_OAUTH_ISSUER` | `https://app.spicrawl.com` | HTTP | The authorization server, listed in the metadata. Tokens are introspected at `<issuer>/api/oauth/introspect`. |
+| `SPICRAWL_OAUTH_INTROSPECT_SECRET` | none | HTTP | This server's bearer secret at the introspection endpoint. Unset, every token is answered `503`. |
+| `SPICRAWL_CHATGPT_ROOT_PRM` | off | HTTP | Also serve the metadata at the root `/.well-known/oauth-protected-resource`. Off by default because `/mcp` takes API keys and must not advertise OAuth. |
+| `SPICRAWL_OPENAI_APPS_CHALLENGE` | none | HTTP | The OpenAI domain-verification token served at `/.well-known/openai-apps-challenge`. |
+| `SPICRAWL_OPENAI_APPS_CHALLENGE_FILE` | none | HTTP | A file holding that token (surrounding whitespace and the trailing newline are dropped). Read when `SPICRAWL_OPENAI_APPS_CHALLENGE` is unset. |
 
 With no docs variable set, a server pointed at a self-hosted API reads that API's own docs at `<SPICRAWL_PUBLIC_BASE_URL or SPICRAWL_BASE_URL>/docs`.
 
@@ -353,6 +360,38 @@ npx -y @spicrawl/mcp --http
 - MCP is served at `POST`/`GET`/`DELETE /mcp`; liveness at `GET /healthz` (no auth).
 - Each caller sends their own key as `Authorization: Bearer spicrawl_live_...`. The key is checked against the API before a session opens (`401` if refused, `503` with `Retry-After` if the API cannot be reached), and a session is pinned to the key that opened it.
 - The server speaks plain HTTP. Put it behind TLS before sending keys across a network.
+
+### ChatGPT endpoint (OAuth)
+
+The same process can serve a second, restricted MCP endpoint for ChatGPT apps. It is off unless `SPICRAWL_CHATGPT_ENABLED` is on, and `/mcp` is unchanged either way.
+
+| Route | What it does |
+|---|---|
+| `POST /chatgpt/mcp` | MCP Streamable HTTP, **stateless**: no `Mcp-Session-Id`, a fresh server per request, JSON responses. Other methods answer `405`. |
+| `GET /.well-known/oauth-protected-resource/chatgpt/mcp` | Protected-resource metadata (RFC 9728): `resource`, `authorization_servers` (the issuer), `scopes_supported: ["scrape","batch"]`, `resource_documentation`. |
+| `GET /.well-known/oauth-protected-resource` | The same document, only with `SPICRAWL_CHATGPT_ROOT_PRM`. |
+| `GET /.well-known/openai-apps-challenge` | The verification token as `text/plain`, exact bytes, no trailing newline; `404` when none is configured. |
+
+Authentication takes OAuth access tokens (`spicrawl_oat_…`) only:
+
+- No token: `401` with `WWW-Authenticate: Bearer resource_metadata="https://mcp.spicrawl.com/.well-known/oauth-protected-resource/chatgpt/mcp", scope="scrape batch"`.
+- A bad, inactive, expired or wrong-audience token, or an API key (`spicrawl_live_…`/`spicrawl_test_…`, never accepted here): the same `401` plus `error="invalid_token", error_description="…"`.
+- A tool call the token's scopes do not cover: `403` with `error="insufficient_scope"`. `spicrawl_scrape` needs `scrape`, the batch tools need `batch`, the docs tools need only a valid token.
+- The authorization server unreachable or refusing this server's secret: `503` with `Retry-After`.
+
+Each token is checked with `POST <issuer>/api/oauth/introspect` (`Authorization: Bearer <SPICRAWL_OAUTH_INTROSPECT_SECRET>`, form body `token=…`). Only `active: true` with `aud` equal to the resource is accepted. A positive answer is cached by the token's SHA-256 for at most 30 seconds and never past its `exp`. Tools run upstream under the `api_key` the introspection returns; neither it nor the token is logged. If the API refuses that key mid-call, the tool returns an error whose `_meta["mcp/www_authenticate"]` carries a fresh `invalid_token` challenge, and the token is dropped from the cache.
+
+The endpoint lists six tools, each with explicit `readOnlyHint`/`destructiveHint`/`openWorldHint`, a title, and `securitySchemes: [{type: "oauth2", scopes: [...]}]` (also in `_meta.securitySchemes`):
+
+| Tool | Scopes | Arguments |
+|---|---|---|
+| `spicrawl_scrape` | `scrape` | `url` (http/https only), `format` (`markdown`/`text`/`html`/`json`), `render`, `main_content_only`, `include_tags`, `exclude_tags`, `links`, `extract` (CSS selectors), `autoparse`, `wait_for`, `cache`, `cache_ttl`, `max_cost` (default 5). Always an HTTP GET. |
+| `spicrawl_batch_submit` | `batch` | `urls` (1 to 25), `format`, `render`, `main_content_only`, `max_cost`, `credit_budget` (default 50). |
+| `spicrawl_batch_status` | `batch` | `job_id`. |
+| `spicrawl_batch_results` | `batch` | `job_id`, `status`, `limit` (default 25, max 100), `cursor`. |
+| `spicrawl_docs_search`, `spicrawl_docs_read` | none | As on `/mcp`. |
+
+Every other argument is refused, not dropped. Results keep the content, the site's status and the credits charged; request ids, timestamps, engine and proxy details, storage references and project ids are left out.
 
 Installed globally (`npm install -g @spicrawl/mcp`), the command is `spicrawl-mcp` (alias `spicrawl-mcp-server`), with `--http`, `--version` and `--help`.
 
@@ -374,7 +413,7 @@ Yes, and with Claude Desktop, Windsurf, Gemini CLI, Codex and any client that sp
 There is no single crawl tool. Scrape a page with `links: true` to get its links, then feed them to an open batch job (`open: true` and `spicrawl_batch_add_items`).
 
 ### Does it support OAuth?
-No. The server accepts Spicrawl API keys only; turn OAuth off for this server in clients that try it on a `401`.
+Not on `/mcp`: it accepts Spicrawl API keys only, so turn OAuth off for it in clients that try it on a `401`. The separate [ChatGPT endpoint](#chatgpt-endpoint-oauth) at `/chatgpt/mcp` takes OAuth access tokens only, when the operator turns it on.
 
 ### Should I use the MCP server, the SDK or the CLI?
 Use the MCP server when an AI agent should call Spicrawl as tools. Use [`@spicrawl/sdk`](https://github.com/Spicrawl/sdk) in your own TypeScript or JavaScript code, [`@spicrawl/cli`](https://github.com/Spicrawl/cli) in a terminal or shell script, and the [REST API](https://docs.spicrawl.com/quickstart) from any other language.

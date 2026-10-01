@@ -113,6 +113,12 @@ export interface ClientConfig {
   docsBaseURL?: string;
 }
 
+/** Per-call options for {@link ILayerClient.request}. */
+export interface RequestOptions {
+  /** Called with the response headers before the body is read (a raw scrape's status and credits travel there). */
+  onHeaders?: (headers: Headers) => void;
+}
+
 export class ILayerClient {
   readonly baseURL: string;
   /** Base URL for URLs returned to the caller; never used for upstream calls. */
@@ -146,6 +152,7 @@ export class ILayerClient {
     method: string,
     path: string,
     body?: Record<string, unknown>,
+    options: RequestOptions = {},
   ): Promise<unknown> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
@@ -176,6 +183,7 @@ export class ILayerClient {
     } finally {
       clearTimeout(timer);
     }
+    options.onHeaders?.(response.headers);
 
     // A PDF (`response_format=pdf`) is bytes: read as text it would be corrupted.
     if (response.ok && mediaType(response) === "application/pdf") return pdfPayload(response);
