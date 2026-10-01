@@ -416,6 +416,23 @@ describe("the restricted tool profile", () => {
     assert.equal(sent.query, "?limit=25");
   });
 
+  test("batch results before the job is terminal: each succeeded item's content is fetched on its own", async () => {
+    const r = await callTool("spicrawl_batch_results", { job_id: "job_finishing" });
+    assert.ok(!r.result.isError, JSON.stringify(r));
+    const out = r.result.structuredContent;
+    assert.deepEqual(out.results.map((x) => x.result), [{ content: "# Zero\n" }, { content: "<p>one</p>" }, { unavailable: true }]);
+    assert.doesNotMatch(JSON.stringify(r), /01REQF|s3:\/\//);
+    for (const seq of [0, 1, 2]) {
+      assert.ok(api.requests.some((x) => x.path === `/v1/batch/job_finishing/tasks/${seq}/content`), `seq ${seq} fetched`);
+    }
+  });
+
+  test("batch results with content inlined: no per-item fetch", async () => {
+    const before = api.requests.length;
+    await callTool("spicrawl_batch_results", { job_id: "job_full" });
+    assert.ok(!api.requests.slice(before).some((x) => x.path.includes("/tasks/")));
+  });
+
   test("an upstream 401 mid-call: a tool error carrying a fresh OAuth challenge", async () => {
     const r = await callTool("spicrawl_scrape", { url: "https://raw.test/" }, REVOKED_KEY);
     assert.equal(r.result.isError, true);

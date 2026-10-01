@@ -152,6 +152,29 @@ export async function startFakeApi() {
     if (req.method === "GET" && p === "/v1/batch/job_full") {
       return json(200, FULL_JOB);
     }
+    // A job whose items have all succeeded but which is not terminal yet: the
+    // results endpoint lists them without `result`, and each body is served
+    // on its own by /tasks/{seq}/content (seq 2 is not readable yet).
+    if (req.method === "GET" && p === "/v1/batch/job_finishing/results") {
+      const lines = [0, 1, 2].map((seq) => ({
+        seq, url: `https://f${seq}.test/`, status: "succeeded", attempts: 1, http_status: 200, credits_micro: 1000000, bytes: 10,
+        request_id: `01REQF${seq}`, result_ref: `s3://bucket/f${seq}`,
+      }));
+      res.writeHead(200, { "Content-Type": "application/x-ndjson" });
+      res.end(lines.map((l) => JSON.stringify(l)).join("\n") + "\n");
+      return;
+    }
+    if (req.method === "GET" && p === "/v1/batch/job_finishing/tasks/0/content") {
+      res.writeHead(200, { "Content-Type": "text/markdown; charset=utf-8" });
+      res.end("# Zero\n");
+      return;
+    }
+    if (req.method === "GET" && p === "/v1/batch/job_finishing/tasks/1/content") {
+      return json(200, "<p>one</p>");
+    }
+    if (req.method === "GET" && p === "/v1/batch/job_finishing/tasks/2/content") {
+      return problem(409, { title: "Conflict", code: "ERR::REQUEST::NOT_READY", detail: "not finished yet", retryable: true });
+    }
     if (req.method === "GET" && p === "/v1/batch/job_full/results") {
       res.writeHead(200, { "Content-Type": "application/x-ndjson" });
       res.end(RESULT_LINES.map((l) => JSON.stringify(l)).join("\n") + "\n");
