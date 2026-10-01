@@ -391,6 +391,8 @@ The endpoint lists six tools, each with explicit `readOnlyHint`/`destructiveHint
 | `spicrawl_batch_results` | `batch` | `job_id`, `status`, `limit` (default 25, max 100), `cursor`. |
 | `spicrawl_docs_search`, `spicrawl_docs_read` | none | As on `/mcp`. |
 
+`spicrawl_scrape` is read-only here, unlike on `/mcp`: this endpoint only sends a GET, with no `method`, body, headers or `actions`. `spicrawl_batch_submit` is not read-only, because it creates a job.
+
 Every other argument is refused, not dropped. Results keep the content, the site's status and the credits charged; request ids, timestamps, engine and proxy details, storage references and project ids are left out.
 
 Installed globally (`npm install -g @spicrawl/mcp`), the command is `spicrawl-mcp` (alias `spicrawl-mcp-server`), with `--http`, `--version` and `--help`.

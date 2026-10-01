@@ -271,7 +271,7 @@ describe("metadata, challenge and kill switch", () => {
 
 // [title, readOnly, destructive, openWorld, scopes]
 const PROFILE = {
-  spicrawl_scrape: ["Fetch a web page", false, false, true, ["scrape"]],
+  spicrawl_scrape: ["Fetch a web page", true, false, true, ["scrape"]],
   spicrawl_batch_submit: ["Start a batch fetch", false, false, true, ["batch"]],
   spicrawl_batch_status: ["Check a batch fetch", true, false, false, ["batch"]],
   spicrawl_batch_results: ["Read a batch fetch's pages", true, false, false, ["batch"]],

@@ -3,6 +3,10 @@
 All notable changes to `@spicrawl/mcp` are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.1.3 — 2026-10-01
+
+- `spicrawl_scrape` on the ChatGPT endpoint (`/chatgpt/mcp`) is now annotated `readOnlyHint: true`. That surface only ever sends an HTTP GET with no method, body, headers or actions, so it cannot change anything on a site. On `/mcp` it stays not read-only, because `method` and `actions` can submit forms.
+
 ## 0.1.2 — 2026-10-01
 
 - Every tool's MCP annotations are now accurate, and a tool without a `title` and explicit `readOnlyHint`, `destructiveHint` and `openWorldHint` no longer compiles. `spicrawl_scrape` is no longer read-only, because `method` and `actions` can submit forms. `spicrawl_session_release` is destructive, because it purges cookies. Tools confined to your own account are no longer open-world. `test/annotations.test.mjs` pins each value.

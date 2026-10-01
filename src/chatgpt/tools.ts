@@ -268,7 +268,9 @@ function registerChatgptTools(server: ChatgptMcpServer, client: ILayerClient, ct
         cache_ttl: z.number().int().min(0).optional().describe("Oldest cached copy to accept, in seconds (0 forces a fresh fetch)."),
         max_cost: z.number().int().min(1).default(5).describe("Refuse the call instead of running it if it would cost more than this many credits. Default 5."),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+      // Read-only here, unlike /mcp: this surface only ever sends a GET with no body, headers or
+      // actions, so it cannot submit a form or change anything on the site.
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },
     async (input) => {
       // Always GET: this surface never sends a method, body, headers or actions to a site.
