@@ -3,6 +3,13 @@
 All notable changes to `@spicrawl/mcp` are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.1.1 — 2026-10-01
+
+Documentation and package metadata only; the server and its 25 tools are unchanged.
+
+- README rewritten for npmjs.com: hosted endpoint first, one-click install links for Cursor and VS Code, per-client setup for Claude Code, Claude Desktop, Cursor, VS Code, Windsurf, Gemini CLI and Codex, tool tables by group, a "which tool to use" guide, environment variables, self-hosting, FAQ and troubleshooting. Every link is absolute so it works on npm.
+- `package.json`: `mcpName` (`io.github.Spicrawl/mcp`) for the official MCP registry, a new `description` and `keywords`, and `homepage` now points at https://docs.spicrawl.com/agents/mcp.
+
 ## 0.1.0 — 2026-10-01
 
 First public release of the Spicrawl MCP server, published to npm as `@spicrawl/mcp` from https://github.com/Spicrawl/mcp with an npm provenance attestation.
