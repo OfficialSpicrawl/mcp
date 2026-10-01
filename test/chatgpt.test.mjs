@@ -271,7 +271,7 @@ describe("metadata, challenge and kill switch", () => {
 
 // [title, readOnly, destructive, openWorld, scopes]
 const PROFILE = {
-  spicrawl_scrape: ["Fetch a web page", false, false, true, ["scrape"]],
+  spicrawl_scrape: ["Fetch a web page", true, false, true, ["scrape"]],
   spicrawl_batch_submit: ["Start a batch fetch", false, false, true, ["batch"]],
   spicrawl_batch_status: ["Check a batch fetch", true, false, false, ["batch"]],
   spicrawl_batch_results: ["Read a batch fetch's pages", true, false, false, ["batch"]],
@@ -414,6 +414,23 @@ describe("the restricted tool profile", () => {
     ]);
     const sent = api.requests.findLast((x) => x.path === "/v1/batch/job_full/results");
     assert.equal(sent.query, "?limit=25");
+  });
+
+  test("batch results before the job is terminal: each succeeded item's content is fetched on its own", async () => {
+    const r = await callTool("spicrawl_batch_results", { job_id: "job_finishing" });
+    assert.ok(!r.result.isError, JSON.stringify(r));
+    const out = r.result.structuredContent;
+    assert.deepEqual(out.results.map((x) => x.result), [{ content: "# Zero\n" }, { content: "<p>one</p>" }, { unavailable: true }]);
+    assert.doesNotMatch(JSON.stringify(r), /01REQF|s3:\/\//);
+    for (const seq of [0, 1, 2]) {
+      assert.ok(api.requests.some((x) => x.path === `/v1/batch/job_finishing/tasks/${seq}/content`), `seq ${seq} fetched`);
+    }
+  });
+
+  test("batch results with content inlined: no per-item fetch", async () => {
+    const before = api.requests.length;
+    await callTool("spicrawl_batch_results", { job_id: "job_full" });
+    assert.ok(!api.requests.slice(before).some((x) => x.path.includes("/tasks/")));
   });
 
   test("an upstream 401 mid-call: a tool error carrying a fresh OAuth challenge", async () => {

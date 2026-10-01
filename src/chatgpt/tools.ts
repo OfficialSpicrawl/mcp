@@ -268,7 +268,9 @@ function registerChatgptTools(server: ChatgptMcpServer, client: ILayerClient, ct
         cache_ttl: z.number().int().min(0).optional().describe("Oldest cached copy to accept, in seconds (0 forces a fresh fetch)."),
         max_cost: z.number().int().min(1).default(5).describe("Refuse the call instead of running it if it would cost more than this many credits. Default 5."),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+      // Read-only here, unlike /mcp: this surface only ever sends a GET with no body, headers or
+      // actions, so it cannot submit a form or change anything on the site.
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },
     async (input) => {
       // Always GET: this surface never sends a method, body, headers or actions to a site.
@@ -370,8 +372,60 @@ function registerChatgptTools(server: ChatgptMcpServer, client: ILayerClient, ct
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ job_id, status, limit, cursor }) =>
-      call(ctx, ["batch"], async () => sanitizeResults(await batchResults(client, job_id, { status, limit, cursor }))),
+      call(ctx, ["batch"], async () => {
+        const page = await batchResults(client, job_id, { status, limit, cursor });
+        await fillMissingContent(client, job_id, page);
+        return sanitizeResults(page);
+      }),
   );
+}
+
+/** Most item bodies fetched one by one for a single results page. */
+const FILL_MAX_ITEMS = 25;
+/** Most bytes of filled-in content per results page, the same cap the results endpoint applies (2 MiB). */
+const FILL_MAX_BYTES = 2 * 1024 * 1024;
+
+/**
+ * The results endpoint inlines `result.content` only once the whole job is
+ * terminal (it reads the stitched result file), but items report `succeeded`
+ * as each finishes. A model that sees every item succeeded and reads results
+ * before the job turns `completed` would get no content at all, so a succeeded
+ * item without a `result` is filled from GET /v1/batch/{id}/tasks/{seq}/content,
+ * which serves a finished item's payload on its own. An item it cannot serve
+ * is marked `unavailable` instead of failing the page, and past FILL_MAX_BYTES
+ * an item is marked `omitted`. A 401 still propagates,
+ * so `call` can answer with a fresh OAuth challenge.
+ */
+export async function fillMissingContent(client: ILayerClient, job_id: string, page: Record<string, unknown>): Promise<void> {
+  if (!Array.isArray(page.results)) return;
+  const missing = page.results
+    .filter((r): r is Obj => isObj(r) && r.status === "succeeded" && !isObj(r.result) && typeof r.seq === "number")
+    .slice(0, FILL_MAX_ITEMS);
+  await Promise.all(
+    missing.map(async (r) => {
+      try {
+        const body = await client.request("GET", `${jobPath(job_id)}/tasks/${encodeURIComponent(String(r.seq))}/content`);
+        const content =
+          typeof body === "string"
+            ? body
+            : isObj(body) && typeof body.content === "string" && Object.keys(body).length === 1
+              ? body.content
+              : JSON.stringify(body);
+        r.result = { content };
+      } catch (err) {
+        if (err instanceof ILayerError && err.status === 401) throw err;
+        r.result = { unavailable: true };
+      }
+    }),
+  );
+  // Over the page cap, later items are left out, as the results endpoint does; spicrawl_scrape fetches one alone.
+  let used = 0;
+  for (const r of missing) {
+    const content = isObj(r.result) ? r.result.content : undefined;
+    if (typeof content !== "string") continue;
+    used += Buffer.byteLength(content);
+    if (used > FILL_MAX_BYTES) r.result = { omitted: true };
+  }
 }
 
 /** One MCP server for one ChatGPT request, running under the API key the token stands for. */
