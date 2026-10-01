@@ -152,7 +152,9 @@ describe("pdf", () => {
     assert.equal(meta.engine, "chromium");
     assert.equal(meta.credits, 8);
     assert.equal(meta.status, 200);
-    assert.equal(meta.request_id, "01TESTPDF0000000000000000");
+    // The API sends X-Request-Id; it is a diagnostic identifier nobody asked for, so it is not passed on.
+    assert.equal(meta.request_id, undefined);
+    assert.ok(!res.content[0].text.includes("01TESTPDF0000000000000000"), "the request id leaked into the text");
     assert.deepEqual(meta.pdf, {
       content_type: "application/pdf",
       size_bytes: PDF_BYTES.length,

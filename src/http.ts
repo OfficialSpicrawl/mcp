@@ -23,6 +23,9 @@
  *                     SPICRAWL_PUBLIC_BASE_URL / SPICRAWL_BASE_URL + /docs, then
  *                     https://docs.spicrawl.com (see docsBaseFromEnv)
  *   SPICRAWL_MCP_SESSION_IDLE_MS  idle session eviction, default 1800000 (30 min)
+ *   SPICRAWL_MCP_HIDE_UNAVAILABLE  1/true/yes/on lists only what works today: no
+ *                     spicrawl_browser_connect_url, no argument marked "Coming soon"
+ *                     (read when a session opens; restart to change it)
  */
 
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";

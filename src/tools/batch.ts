@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { COMING_SOON, run, type RegisterTools } from "./common.js";
+import { COMING_SOON, availableOnly, run, type RegisterTools } from "./common.js";
 
 const jobPath = (id: string) => `/v1/batch/${encodeURIComponent(id)}`;
 
@@ -108,7 +108,9 @@ const itemsInput = {
     ),
 };
 
-export const registerBatchTools: RegisterTools = (server, client) => {
+export const registerBatchTools: RegisterTools = (server, client, { hideUnavailable }) => {
+  const shared = availableOnly(sharedParams, hideUnavailable);
+
   // -------------------------------------------------------------------------
   // spicrawl_batch_submit — POST /v1/batch
   // -------------------------------------------------------------------------
@@ -125,7 +127,7 @@ export const registerBatchTools: RegisterTools = (server, client) => {
         "finishes until you call `spicrawl_batch_close`.",
       inputSchema: {
         ...itemsInput,
-        ...sharedParams,
+        ...shared,
         name: z.string().optional().describe("A human label for the job."),
         open: z
           .boolean()
@@ -190,7 +192,7 @@ export const registerBatchTools: RegisterTools = (server, client) => {
         limit: z.number().int().min(1).max(200).optional().describe("Page size (default 50, max 200)."),
         cursor: z.string().optional().describe("`next_cursor` from a previous page, verbatim."),
       },
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ status, limit, cursor }) =>
       run(() => client.request("GET", withQuery("/v1/batch", { status, limit, cursor }))),
@@ -207,7 +209,7 @@ export const registerBatchTools: RegisterTools = (server, client) => {
         "Return one batch job with its status and progress (total/completed/succeeded/failed/remaining, credits charged). " +
         "Poll this after `spicrawl_batch_submit`; once status is `completed`, `failed` or `cancelled`, read `spicrawl_batch_results`.",
       inputSchema: { job_id: jobId },
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ job_id }) => run(() => client.request("GET", jobPath(job_id))),
   );
@@ -233,7 +235,7 @@ export const registerBatchTools: RegisterTools = (server, client) => {
         limit: z.number().int().min(1).max(5000).optional().describe("Page size (default 500, max 5000)."),
         cursor: z.string().optional().describe("`next_cursor` from a previous page, verbatim."),
       },
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ job_id, status, limit, cursor }) =>
       run(async () => {
@@ -279,7 +281,7 @@ export const registerBatchTools: RegisterTools = (server, client) => {
         job_id: jobId,
         seq: z.number().int().min(0).describe("The item's sequence number (0-based, submission order)."),
       },
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ job_id, seq }) =>
       run(() => client.request("GET", `${jobPath(job_id)}/tasks/${encodeURIComponent(String(seq))}/content`)),
@@ -297,7 +299,7 @@ export const registerBatchTools: RegisterTools = (server, client) => {
         "their results; items already running finish first, so the job comes back `cancelling` and moves to " +
         "`cancelled` when they drain. Cannot be undone — resubmit to run the URLs again. Returns the job object.",
       inputSchema: { job_id: jobId },
-      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
     async ({ job_id }) => run(() => client.request("POST", `${jobPath(job_id)}/cancel`)),
   );
@@ -330,7 +332,7 @@ export const registerBatchTools: RegisterTools = (server, client) => {
         "`spicrawl_batch_submit` (EITHER `urls` or `items`, not both, plus shared settings for these new items). Fails with CONFLICT " +
         "if the job is closed or finished. Not idempotent: calling twice adds the URLs twice. " +
         "Returns `{ job, items_added, items_dispatched }`.",
-      inputSchema: { job_id: jobId, ...itemsInput, ...sharedParams },
+      inputSchema: { job_id: jobId, ...itemsInput, ...shared },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },
     async (input) => {
@@ -355,7 +357,7 @@ export const registerBatchTools: RegisterTools = (server, client) => {
         "Stop an open batch job accepting items, so it completes once its queued work drains. " +
         "Idempotent (closing a closed job succeeds). Returns the job object.",
       inputSchema: { job_id: jobId },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ job_id }) => run(() => client.request("POST", `${jobPath(job_id)}/close`)),
   );

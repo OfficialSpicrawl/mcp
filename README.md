@@ -61,6 +61,7 @@ or in a project's `.mcp.json`:
 **VS Code** (`.vscode/mcp.json`; VS Code uses the `servers` key). The `inputs` entry makes VS Code ask for the key once and store it, so the file is safe to commit:
 
 ```json
+| `SPICRAWL_MCP_HIDE_UNAVAILABLE` | no | off | `1`, `true`, `yes` or `on` leaves out what is announced but not available yet: `spicrawl_browser_connect_url` is not registered (24 tools) and every argument marked "Coming soon" is dropped from the schemas (`ai_extract`, `stealth`, `extract_preset`, `premium_proxy`, `proxy_country`, `sticky_key`, and the session `rotate_ip`, `region_pool` and `fingerprint`). The `camoufox` engine value stays in the `engine` enums. Read when the server starts a session, so restart the process after changing it. |
 {
   "inputs": [
     { "type": "promptString", "id": "spicrawl-api-key", "description": "Spicrawl API key", "password": true }
@@ -208,10 +209,11 @@ Once connected, an agent can act on requests like:
 ## Behaviour worth knowing
 
 - Tools reject unknown arguments rather than ignoring them. A misspelt or unsupported field (e.g. `js_render` on `spicrawl_scrape`, whose argument is `render`) fails the call with an error naming it, so a setting the agent believes it applied is never dropped.
+- Every tool sets a `title` and the MCP annotations `readOnlyHint`, `destructiveHint` and `openWorldHint` as explicit booleans, so a client can tell which calls to confirm. `spicrawl_scrape` is not read-only: its `method` and `actions` arguments can submit a form or write to the target site. `spicrawl_batch_cancel`, `spicrawl_session_release` and `spicrawl_session_delete` are destructive (a released session's cookies are purged). The tools confined to your own account (batch reads, sessions, usage, request history) are not open-world; the scrape, batch-submission and docs tools are. `test/annotations.test.mjs` pins each value with its reason, and a new tool without them does not compile.
 - Errors carry the platform's own code and guidance (e.g. `ERR::UPSTREAM::CHALLENGE` when a site served a bot wall), so the agent can decide whether to retry or change parameters.
 - `spicrawl_scrape` screenshots come back as MCP image content blocks the model can see. In the JSON, each `screenshots` entry keeps its metadata but its base64 is replaced by a pointer to its block. An image over 5 MB of base64 is not attached, and its entry says how to get a smaller one.
 - `spicrawl_scrape` with `format: "pdf"` (plus `render` or `engine: "chromium"`) returns the printed page as an MCP resource block (`application/pdf`). A PDF over 10 MB of base64 is not attached; `pdf.not_attached` says so.
-- Coming soon, and marked so in the tool descriptions: `ai_extract`, stealth mode (`stealth`, engine `camoufox`), `extract_preset`, the managed proxy pool (`premium_proxy`, `proxy_country`, `sticky_key`, session `rotate_ip`/`region_pool`) and `spicrawl_browser_connect_url`. The schemas already accept them so nothing changes the day they ship; until then agents should not send them.
+- Coming soon, and marked so in the tool descriptions: `ai_extract`, stealth mode (`stealth`, engine `camoufox`), `extract_preset`, the managed proxy pool (`premium_proxy`, `proxy_country`, `sticky_key`, session `rotate_ip`/`region_pool`) and `spicrawl_browser_connect_url`. The schemas already accept them so nothing changes the day they ship; until then agents should not send them. To list only what works today, set `SPICRAWL_MCP_HIDE_UNAVAILABLE=1` (see Configuration).
 
 ## Self-hosting the HTTP server
 

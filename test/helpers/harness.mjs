@@ -38,6 +38,12 @@ export const PDF_BYTES = Buffer.concat([Buffer.from("%PDF-1.7\n%"), Buffer.from(
 // Over the 10 MB of base64 the scrape tool returns (8 MiB raw is ~11.2 MB base64).
 export const OVERSIZED_PDF = Buffer.concat([PDF_BYTES, Buffer.alloc(8 * 1024 * 1024)]);
 
+// The out-of-credit problem as the API writes it (api/internal/scrape/handler.go quotaRefusal,
+// httpx.DocURL): an explanation and a link to the errors page, nothing to buy or upgrade.
+export const QUOTA_DETAIL =
+  "This organization's monthly credit allowance is used up. It resets at 00:00 UTC on 2026-10-28; an operator can raise the ceiling sooner.";
+export const QUOTA_DOC_URL = "https://docs.spicrawl.com/errors#LIMIT_QUOTA_EXCEEDED";
+
 export const BATCH_JOB = {
   id: "job_123",
   status: "running",
@@ -107,6 +113,12 @@ export async function startFakeApi() {
           title: "Bad Request", code: "ERR::PARAM::INVALID",
           detail: "`actions` needs a browser: set `js_render=true`. `response_format=pdf` is not allowed here.",
           retryable: false,
+        });
+      }
+      if (body?.url === "https://over-quota.test/") {
+        return problem(402, {
+          title: "Credit quota exhausted", code: "ERR::LIMIT::QUOTA_EXCEEDED",
+          detail: QUOTA_DETAIL, retryable: false, doc_url: QUOTA_DOC_URL,
         });
       }
       // response_format=pdf: the file itself, with the envelope's fields as headers.

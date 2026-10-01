@@ -22,6 +22,8 @@
  *                    http://HOST:8080/docs self-hosted; default SPICRAWL_DOCS_HOST
  *                    + /docs (legacy), then a self-hosted SPICRAWL_PUBLIC_BASE_URL /
  *                    SPICRAWL_BASE_URL + /docs, then https://docs.spicrawl.com
+ *   SPICRAWL_MCP_HIDE_UNAVAILABLE  optional — 1/true/yes/on lists only what works today:
+ *                    no spicrawl_browser_connect_url, no argument marked "Coming soon"
  *
  * Transport is stdio: this runs as a subprocess of an MCP client (Claude Code,
  * Claude Desktop, Cursor, …), which is the local-integration case the MCP spec
