@@ -3,8 +3,11 @@
 All notable changes to `@spicrawl/mcp` are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 0.1.2 — 2026-10-01
 
+- Every tool's MCP annotations are now accurate, and a tool without a `title` and explicit `readOnlyHint`, `destructiveHint` and `openWorldHint` no longer compiles. `spicrawl_scrape` is no longer read-only, because `method` and `actions` can submit forms. `spicrawl_session_release` is destructive, because it purges cookies. Tools confined to your own account are no longer open-world. `test/annotations.test.mjs` pins each value.
+- `SPICRAWL_MCP_HIDE_UNAVAILABLE` (off by default) leaves out what is announced but not available yet: `spicrawl_browser_connect_url` is not registered and every "Coming soon" argument is dropped from the schemas.
+- Tool descriptions no longer name another product. The scrape description states billing and side effects. A printed PDF's JSON no longer carries the request id.
 - A ChatGPT endpoint on the HTTP server, off unless `SPICRAWL_CHATGPT_ENABLED` is on: stateless `POST /chatgpt/mcp` that takes OAuth access tokens only (introspected at `<SPICRAWL_OAUTH_ISSUER>/api/oauth/introspect`, positive answers cached at most 30 s), protected-resource metadata at `/.well-known/oauth-protected-resource/chatgpt/mcp` (and at the root with `SPICRAWL_CHATGPT_ROOT_PRM`), the OpenAI domain challenge at `/.well-known/openai-apps-challenge`, and a restricted six-tool profile with OAuth `securitySchemes` and sanitized results. `/mcp` is unchanged.
 
 ## 0.1.1 — 2026-10-01
