@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { COMING_SOON, run, type RegisterTools } from "./common.js";
+import { COMING_SOON, availableOnly, run, type RegisterTools } from "./common.js";
 
 const sessionPath = (id: string) => `/v1/sessions/${encodeURIComponent(id)}`;
 
@@ -19,7 +19,7 @@ const force = z
 const engines = ["fetch", "obscura", "chromium", "camoufox"] as const;
 
 // Sessions: /v1/sessions.
-export const registerSessionsTools: RegisterTools = (server, client) => {
+export const registerSessionsTools: RegisterTools = (server, client, { hideUnavailable }) => {
   // -------------------------------------------------------------------------
   // spicrawl_session_create — POST /v1/sessions
   // -------------------------------------------------------------------------
@@ -34,7 +34,7 @@ export const registerSessionsTools: RegisterTools = (server, client) => {
         "state. The engine is pinned for the session's lifetime. Without `engine`, the server picks one this deployment " +
         "runs: `obscura`, else `chromium`, else `fetch`. Release the session with `spicrawl_session_release` when done. " +
         "Returns the session object (id, engine, status, sticky_key, proxy, expires_at).",
-      inputSchema: {
+      inputSchema: availableOnly({
         engine: z
           .enum(engines)
           .optional()
@@ -81,8 +81,9 @@ export const registerSessionsTools: RegisterTools = (server, client) => {
           .describe(
             "Seed the session's state (cookies, storage) — e.g. the `session_context` object from spicrawl_session_context, to clone a session.",
           ),
-      },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+      }, hideUnavailable),
+      // Creates a persistent record in the user's own account; nothing outside it is contacted.
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
     async (input) => {
       const body: Record<string, unknown> = {};
@@ -107,7 +108,7 @@ export const registerSessionsTools: RegisterTools = (server, client) => {
         limit: z.number().int().min(1).max(200).optional().describe("Page size (default 50, max 200)."),
         cursor: z.string().optional().describe("`next_cursor` from a previous page, verbatim."),
       },
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ status, engine, limit, cursor }) =>
       run(() => client.request("GET", withQuery("/v1/sessions", { status, engine, limit, cursor }))),
@@ -124,7 +125,7 @@ export const registerSessionsTools: RegisterTools = (server, client) => {
         "Return one session's metadata: status, engine, proxy/exit, usage count, expiry, lease holder, and a summary " +
         "of its stored context. Never returns the credentials themselves (use spicrawl_session_context for that).",
       inputSchema: { session_id: sessionId },
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ session_id }) => run(() => client.request("GET", sessionPath(session_id))),
   );
@@ -141,7 +142,7 @@ export const registerSessionsTools: RegisterTools = (server, client) => {
         "fingerprint and domain scores. The `session_context` object can be passed to spicrawl_session_create to clone " +
         "the session. The result contains secrets (login cookies): do not echo it to the user or logs unless asked.",
       inputSchema: { session_id: sessionId },
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ session_id }) => run(() => client.request("GET", `${sessionPath(session_id)}/context`)),
   );
@@ -155,10 +156,11 @@ export const registerSessionsTools: RegisterTools = (server, client) => {
       title: "Release a session",
       description:
         "End a session when you are done with it: frees its exit IP and browser state; it can no longer be used with " +
-        "spicrawl_scrape. The record stays visible (status `released`) so its history can still be inspected. " +
+        "spicrawl_scrape. Its stored cookies and storage are purged and cannot be recovered; start a new session and log in again to continue. " +
+        "The record stays visible (status `released`) so its history can still be inspected. " +
         "Refused while a scrape holds the session's lease unless `force` is true. Returns the session object.",
       inputSchema: { session_id: sessionId, force },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
     async ({ session_id, force }) =>
       run(() => client.request("POST", withQuery(`${sessionPath(session_id)}/release`, { force }))),
@@ -176,7 +178,7 @@ export const registerSessionsTools: RegisterTools = (server, client) => {
         "if you only want to stop using it). Idempotent: deleting an already-deleted session succeeds. Refused while a " +
         "scrape holds the session's lease unless `force` is true.",
       inputSchema: { session_id: sessionId, force },
-      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
     async ({ session_id, force }) =>
       run(async () => {

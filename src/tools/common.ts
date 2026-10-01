@@ -1,8 +1,18 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { z } from "zod";
 import { ILayerClient, ILayerError } from "../client.js";
+import type { SpicrawlMcpServer } from "../server.js";
+
+/** How the server was asked to present itself; every tools module receives the same value. */
+export interface ToolOptions {
+  /**
+   * Leave out what is announced but not available yet (SPICRAWL_MCP_HIDE_UNAVAILABLE):
+   * the browser tool, and every argument marked {@link COMING_SOON}.
+   */
+  hideUnavailable: boolean;
+}
 
 /** Every tools module exports one of these; server.ts calls them all. */
-export type RegisterTools = (server: McpServer, client: ILayerClient) => void;
+export type RegisterTools = (server: SpicrawlMcpServer, client: ILayerClient, options: ToolOptions) => void;
 
 /**
  * Leads the description of an argument for a feature that is not available yet (the
@@ -10,6 +20,22 @@ export type RegisterTools = (server: McpServer, client: ILayerClient) => void;
  * ships; the words tell an agent not to send it now.
  */
 export const COMING_SOON = "Coming soon: not available yet, do not send. ";
+
+/**
+ * A tool's argument shape without the arguments marked {@link COMING_SOON}, when
+ * `hide` is set; the shape itself otherwise. The marker is the one source of truth for
+ * "not available yet", so a new coming-soon argument is hidden by writing its description
+ * the way every other one is.
+ *
+ * The return type stays the full shape on purpose: handlers read the hidden arguments
+ * as optional and see `undefined`, exactly as when a caller leaves them out.
+ */
+export function availableOnly<T extends z.ZodRawShape>(shape: T, hide: boolean): T {
+  if (!hide) return shape;
+  return Object.fromEntries(
+    Object.entries(shape).filter(([, schema]) => !schema.description?.startsWith(COMING_SOON)),
+  ) as T;
+}
 
 export type ImageBlock = { type: "image"; data: string; mimeType: string };
 

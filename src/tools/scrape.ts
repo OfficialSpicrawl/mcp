@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { COMING_SOON, run, type RegisterTools } from "./common.js";
+import { COMING_SOON, availableOnly, run, type RegisterTools } from "./common.js";
 import { attachScreenshots } from "./screenshots.js";
 import { attachPdf } from "./pdf.js";
 import { ActionsSchema, toApiActions } from "./actions.js";
 
-export const registerScrapeTools: RegisterTools = (server, client) => {
+export const registerScrapeTools: RegisterTools = (server, client, { hideUnavailable }) => {
 // ---------------------------------------------------------------------------
 // spicrawl_scrape — retrieve, render, and extract one URL
 // ---------------------------------------------------------------------------
@@ -28,7 +28,7 @@ const ScrapeInput = {
     .boolean()
     .optional()
     .describe(
-      "Strip the page to its main article, dropping nav/footer/aside (like Firecrawl's onlyMainContent). Defaults on for markdown.",
+      "Strip the page to its main article, dropping nav/footer/aside. Defaults on for markdown.",
     ),
   include_tags: z
     .array(z.string())
@@ -103,7 +103,12 @@ const ScrapeInput = {
   mode: z.enum(["auto"]).optional().describe("Routing mode. `auto` lets the platform escalate fetch -> browser as needed, billing only the rung that worked."),
   stealth: z.boolean().optional().describe(COMING_SOON + "Stealth mode: render in the hardened Camoufox browser. Default false."),
   headless: z.boolean().optional().describe("false runs Chromium on a real display (1920x1080 screen). chromium engine only."),
-  method: z.string().optional().describe("HTTP method for the target request (default GET)."),
+  method: z
+    .string()
+    .optional()
+    .describe(
+      "HTTP method sent to the target (default GET; no request body can be sent). Anything but GET, HEAD or OPTIONS can change state on the target site: use it only when the user asks.",
+    ),
   custom_headers: z.record(z.string()).optional().describe("Extra request headers sent to the target, e.g. {\"Accept-Language\":\"de\"}."),
   session_id: z
     .string()
@@ -162,6 +167,10 @@ const PASSTHROUGH = [
   "network_capture", "parse_pdf", "max_cost", "original_status", "allowed_status_codes",
 ] as const;
 
+// What the description says about the one argument that only exists while it is not hidden.
+const aiExtractNote = hideUnavailable ? "" : " (a natural-language `ai_extract` is coming soon)";
+const aiExtractKey = hideUnavailable ? "" : "`ai_extract`, ";
+
 server.registerTool(
   "spicrawl_scrape",
   {
@@ -169,15 +178,24 @@ server.registerTool(
     description:
       "Retrieve a web page and return its content as markdown (default), text, HTML, a JSON envelope, or a printed PDF. " +
       "Handles the fetch vs. browser decision, charset decoding, and PDF-to-text for you. " +
-      "Optionally extract structured data with CSS selectors (`extract`) or `autoparse` (a natural-language `ai_extract` is coming soon), " +
+      `Optionally extract structured data with CSS selectors (\`extract\`) or \`autoparse\`${aiExtractNote}, ` +
       "return discovered `links`, take a `screenshot`, or scope the DOM with `include_tags`/`exclude_tags`. " +
+      "Each successful call is billed in credits (a failure costs 0). " +
       "Results are cached by default, and a cache hit is billed like the fetch that stored it (the cache saves time, not credits); set `cache=false` for time-sensitive pages. " +
-      "Returns the content plus a `meta` object (engine, status, credits, cache state). " +
+      "With the defaults it only reads the page. A `method` other than GET, HEAD or OPTIONS, and the `actions` that click, fill or run scripts on the page, " +
+      "can change state on the target site: set them only when the user asks for that. " +
+      "For markdown, text and HTML it returns `{ content }`. With `format: \"json\"`, or when " +
+      `\`extract\`, ${aiExtractKey}\`autoparse\`, \`links\`, \`screenshot\` or \`network_capture\` is set, it returns the JSON envelope: ` +
+      "`content`, the site's `status`, `credits`, `engine`, `warnings` and `data` for extraction. " +
       "Screenshots come back as image content blocks; each `screenshots` entry in the JSON keeps its metadata and says which block holds it. " +
       "A PDF comes back as a resource content block, with its size and the engine and credits in the JSON.",
-    inputSchema: ScrapeInput,
+    inputSchema: availableOnly(ScrapeInput, hideUnavailable),
+    // Not read-only, whatever the default call does: `method` accepts POST/PUT/PATCH/DELETE
+    // and `actions` can click, fill and run scripts on the target page, so a call can submit
+    // a form or write to a third-party site (a write-style outbound action). Not marked
+    // destructive: a plain call is additive. Open-world: any public URL.
     annotations: {
-      readOnlyHint: true,
+      readOnlyHint: false,
       destructiveHint: false,
       idempotentHint: false,
       openWorldHint: true,

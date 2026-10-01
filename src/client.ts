@@ -235,7 +235,7 @@ async function pdfPayload(response: Response): Promise<Record<string, unknown>> 
     status: number("x-target-status"),
     credits: number("x-credits-charged"),
     final_url: header("x-final-url"),
-    request_id: header("x-request-id"),
+    // X-Request-Id is left out on purpose: a diagnostic identifier the caller did not ask for.
   };
   for (const [k, v] of Object.entries(fields)) if (v !== undefined) out[k] = v;
   return out;

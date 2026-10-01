@@ -3,6 +3,7 @@ import { McpServer, type RegisteredTool, type ToolCallback } from "@modelcontext
 import type { AnySchema, ZodRawShapeCompat } from "@modelcontextprotocol/sdk/server/zod-compat.js";
 import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import { ILayerClient, PACKAGE_VERSION } from "./client.js";
+import type { ToolOptions } from "./tools/common.js";
 import { registerScrapeTools } from "./tools/scrape.js";
 import { registerBatchTools } from "./tools/batch.js";
 import { registerSessionsTools } from "./tools/sessions.js";
@@ -115,22 +116,36 @@ function strictInputSchema(schema: ZodRawShapeCompat | AnySchema | undefined): Z
 }
 
 /**
- * McpServer whose registerTool makes every tool's input schema strict. Tools
- * keep declaring plain raw shapes; this one place guarantees none of them (or
- * any tool added later) can silently drop an argument.
+ * The annotations every tool must state. MCP leaves all of them optional and a client
+ * then assumes the worst for a missing one (not read-only, destructive, open-world),
+ * while directories such as OpenAI's plugin review require each to be an explicit
+ * boolean. Typing them as required here makes a tool without them a compile error;
+ * test/annotations.test.mjs pins each tool's actual values.
  */
-class StrictArgsMcpServer extends McpServer {
+export type RequiredToolAnnotations = ToolAnnotations & {
+  readOnlyHint: boolean;
+  destructiveHint: boolean;
+  openWorldHint: boolean;
+};
+
+/**
+ * McpServer whose registerTool makes every tool's input schema strict, and requires
+ * a human-readable title and the explicit annotations. Tools keep declaring plain
+ * raw shapes; this one place guarantees none of them (or any tool added later) can
+ * silently drop an argument or ship without its hints.
+ */
+export class SpicrawlMcpServer extends McpServer {
   override registerTool<
     OutputArgs extends ZodRawShapeCompat | AnySchema,
     InputArgs extends undefined | ZodRawShapeCompat | AnySchema = undefined,
   >(
     name: string,
     config: {
-      title?: string;
+      title: string;
       description?: string;
       inputSchema?: InputArgs;
       outputSchema?: OutputArgs;
-      annotations?: ToolAnnotations;
+      annotations: RequiredToolAnnotations;
       _meta?: Record<string, unknown>;
     },
     cb: ToolCallback<InputArgs>,
@@ -145,12 +160,34 @@ class StrictArgsMcpServer extends McpServer {
   }
 }
 
+/** Environment values read as "on": `1`, `true`, `yes` or `on`, in any case. */
+const TRUTHY = /^(1|true|yes|on)$/i;
+
+/**
+ * SPICRAWL_MCP_HIDE_UNAVAILABLE: whether to leave out what is announced but not
+ * available yet. Off by default, so the tool list does not change unless an operator asks.
+ */
+export function hideUnavailableFromEnv(env: NodeJS.ProcessEnv = process.env): boolean {
+  return TRUTHY.test((env.SPICRAWL_MCP_HIDE_UNAVAILABLE ?? "").trim());
+}
+
+export interface ServerOptions {
+  /**
+   * Leave out `spicrawl_browser_connect_url` (it always fails until remote browsers
+   * ship) and every argument whose description starts with the coming-soon marker
+   * (`ai_extract`, `stealth`, `premium_proxy`, ...), so the server lists only what works.
+   * Default: SPICRAWL_MCP_HIDE_UNAVAILABLE.
+   */
+  hideUnavailable?: boolean;
+}
+
 /**
  * One MCP server bound to one caller's API key. The stdio entry builds one for
  * the process; the HTTP entry builds one per session, from that session's key.
  */
-export function buildServer(client: ILayerClient): McpServer {
-  const server = new StrictArgsMcpServer({ name: SERVER_NAME, version: SERVER_VERSION });
+export function buildServer(client: ILayerClient, options: ServerOptions = {}): McpServer {
+  const toolOptions: ToolOptions = { hideUnavailable: options.hideUnavailable ?? hideUnavailableFromEnv() };
+  const server = new SpicrawlMcpServer({ name: SERVER_NAME, version: SERVER_VERSION });
   for (const register of [
     registerScrapeTools,
     registerBatchTools,
@@ -160,7 +197,7 @@ export function buildServer(client: ILayerClient): McpServer {
     registerBrowserTools,
     registerDocsTools,
   ]) {
-    register(server, client);
+    register(server, client, toolOptions);
   }
   return server;
 }

@@ -234,15 +234,15 @@ export const registerDocsTools: RegisterTools = (server, client) => {
     {
       title: "Search the Spicrawl docs",
       description:
-        "Full-text search over the Spicrawl documentation (guides, API reference, errors, limits). Use it BEFORE guessing a parameter name, value or " +
-        "combination for a spicrawl_* tool, and whenever an error needs explaining: search the error code itself (e.g. `ERR::UPSTREAM::CHALLENGE`) and " +
+        "Full-text search over the Spicrawl documentation (guides, API reference, errors, limits). Use it to look up a parameter name, value or " +
+        "combination for a spicrawl_* tool, or to explain an error a spicrawl_* tool returned: search the error code itself (e.g. `ERR::UPSTREAM::CHALLENGE`) and " +
         "the result also carries a direct link to that code's entry on the errors page. Returns the best-matching pages, each with its title, the " +
         "matching sections (heading, a short snippet, URL) and md_url; then call spicrawl_docs_read with a page's md_url or url to read it in full.",
       inputSchema: {
         query: z.string().trim().min(1).max(200).describe("What to look for: a feature, parameter, error code or question, e.g. 'wait_for selector' or 'ERR::AUTH::INSUFFICIENT_SCOPE'."),
         limit: z.number().int().min(1).max(20).optional().describe("Maximum pages to return, 1-20. Default 8."),
       },
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
     async ({ query, limit }) =>
       run(async () => {
@@ -288,7 +288,7 @@ export const registerDocsTools: RegisterTools = (server, client) => {
           .max(500)
           .describe("Page path (`guides/anti-bot`, `errors#AUTH_INVALID_KEY`) or a full docs URL, as returned by spicrawl_docs_search."),
       },
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
     async ({ path }) =>
       run(async () => {
@@ -315,7 +315,7 @@ export const registerDocsTools: RegisterTools = (server, client) => {
         "The docs' llms.txt: every Spicrawl documentation page with its title, a one-line description and its Markdown URL. Use it to find the right " +
         "page when a search does not, or to get an overview of what is documented; read a page with spicrawl_docs_read. No parameters.",
       inputSchema: {},
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
     async () =>
       run(async () => {

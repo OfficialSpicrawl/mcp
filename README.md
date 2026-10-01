@@ -61,7 +61,7 @@ Both transports serve the same 25 `spicrawl_*` tools, and every call runs under 
 
 ## Tools
 
-25 tools, grouped by task. Tools reject unknown arguments, so a misspelt field fails with an error naming it instead of being silently dropped. Full argument reference: [docs.spicrawl.com/agents/mcp](https://docs.spicrawl.com/agents/mcp#tools).
+25 tools, grouped by task. Tools reject unknown arguments, so a misspelt field fails with an error naming it instead of being silently dropped. Every tool sets a `title` and explicit `readOnlyHint`, `destructiveHint` and `openWorldHint` annotations, so a client knows which calls to confirm: `spicrawl_scrape` is not read-only (its `method` and `actions` can submit forms), and `spicrawl_batch_cancel`, `spicrawl_session_release` and `spicrawl_session_delete` are destructive. Full argument reference: [docs.spicrawl.com/agents/mcp](https://docs.spicrawl.com/agents/mcp#tools).
 
 ### Scrape a website to Markdown
 
@@ -114,7 +114,7 @@ Both transports serve the same 25 `spicrawl_*` tools, and every call runs under 
 
 ### Coming soon
 
-`spicrawl_browser_connect_url` will mint a single-use CDP WebSocket URL for driving a Spicrawl-hosted browser from Puppeteer or Playwright; remote browsers are not available yet. The schemas also accept `ai_extract`, `stealth`, `extract_preset`, `premium_proxy`, `proxy_country` and `sticky_key` ahead of launch. Agents should not send them yet.
+`spicrawl_browser_connect_url` will mint a single-use CDP WebSocket URL for driving a Spicrawl-hosted browser from Puppeteer or Playwright; remote browsers are not available yet. The schemas also accept `ai_extract`, `stealth`, `extract_preset`, `premium_proxy`, `proxy_country` and `sticky_key` ahead of launch. Agents should not send them yet. To list only what works today, set `SPICRAWL_MCP_HIDE_UNAVAILABLE=1` (see [Environment variables](https://github.com/Spicrawl/mcp#environment-variables)).
 
 ## Example prompts
 
@@ -335,6 +335,7 @@ A stdio-only client runs `npx -y @spicrawl/mcp` with `SPICRAWL_API_KEY` in its e
 | `SPICRAWL_DOCS_HOST` | none | both | Legacy: an origin whose docs are at `/docs`. Read only when `SPICRAWL_DOCS_URL` is unset. |
 | `SPICRAWL_MCP_ADDR` | `127.0.0.1:8090` | HTTP | Listen address, `host:port`. |
 | `SPICRAWL_MCP_SESSION_IDLE_MS` | `1800000` (30 min) | HTTP | Idle MCP sessions are dropped after this long. |
+| `SPICRAWL_MCP_HIDE_UNAVAILABLE` | off | both | `1`, `true`, `yes` or `on` leaves out what is announced but not available yet: `spicrawl_browser_connect_url` is not registered (24 tools) and every argument marked "Coming soon" is dropped from the schemas (`ai_extract`, `stealth`, `extract_preset`, `premium_proxy`, `proxy_country`, `sticky_key`, and the session `rotate_ip`, `region_pool` and `fingerprint`). The `camoufox` engine value stays in the `engine` enums. Read when the server starts a session, so restart the process after changing it. |
 
 With no docs variable set, a server pointed at a self-hosted API reads that API's own docs at `<SPICRAWL_PUBLIC_BASE_URL or SPICRAWL_BASE_URL>/docs`.
 

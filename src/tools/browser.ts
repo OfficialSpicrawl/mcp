@@ -3,7 +3,10 @@ import { run, type RegisterTools } from "./common.js";
 
 // Browser (CDP): GET /v1/browser is a WebSocket; MCP cannot carry it, so this
 // module mints a single-use token URL for the caller's own Puppeteer/Playwright.
-export const registerBrowserTools: RegisterTools = (server, client) => {
+// Remote browsers are coming soon and minting always fails today, so the tool is
+// not registered when the server hides what is unavailable (SPICRAWL_MCP_HIDE_UNAVAILABLE).
+export const registerBrowserTools: RegisterTools = (server, client, { hideUnavailable }) => {
+  if (hideUnavailable) return;
   server.registerTool(
     "spicrawl_browser_connect_url",
     {
@@ -54,7 +57,8 @@ export const registerBrowserTools: RegisterTools = (server, client) => {
           .optional()
           .describe("Your own proxy, as http://user:pass@host:port. Replaces our pool, so proxy_country, proxy_region and sticky_key cannot be combined with it. Kept out of the returned URL."),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      // Mints a token (state) and opens a browser that can go anywhere on the web.
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },
     async (args) =>
       run(async () => {
