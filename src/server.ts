@@ -163,12 +163,15 @@ export class SpicrawlMcpServer extends McpServer {
 /** Environment values read as "on": `1`, `true`, `yes` or `on`, in any case. */
 const TRUTHY = /^(1|true|yes|on)$/i;
 
+/** Whether an environment value reads as "on" (see TRUTHY); unset is off. */
+export const isTruthy = (v: string | undefined): boolean => TRUTHY.test((v ?? "").trim());
+
 /**
  * SPICRAWL_MCP_HIDE_UNAVAILABLE: whether to leave out what is announced but not
  * available yet. Off by default, so the tool list does not change unless an operator asks.
  */
 export function hideUnavailableFromEnv(env: NodeJS.ProcessEnv = process.env): boolean {
-  return TRUTHY.test((env.SPICRAWL_MCP_HIDE_UNAVAILABLE ?? "").trim());
+  return isTruthy(env.SPICRAWL_MCP_HIDE_UNAVAILABLE);
 }
 
 export interface ServerOptions {

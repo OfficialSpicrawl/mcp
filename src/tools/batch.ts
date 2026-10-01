@@ -1,7 +1,8 @@
 import { z } from "zod";
+import type { ILayerClient } from "../client.js";
 import { COMING_SOON, availableOnly, run, type RegisterTools } from "./common.js";
 
-const jobPath = (id: string) => `/v1/batch/${encodeURIComponent(id)}`;
+export const jobPath = (id: string) => `/v1/batch/${encodeURIComponent(id)}`;
 
 /** Appends a query string built from the defined entries of `q`. */
 function withQuery(path: string, q: Record<string, string | number | boolean | undefined>): string {
@@ -9,6 +10,40 @@ function withQuery(path: string, q: Record<string, string | number | boolean | u
   for (const [k, v] of Object.entries(q)) if (v !== undefined) params.set(k, String(v));
   const s = params.toString();
   return s ? `${path}?${s}` : path;
+}
+
+/**
+ * One page of a batch job's finished items: `{ results: [...], next_cursor? }`.
+ * Shared by spicrawl_batch_results and the ChatGPT profile's copy of it.
+ */
+export async function batchResults(
+  client: ILayerClient,
+  job_id: string,
+  { status, limit, cursor }: { status?: string; limit?: number; cursor?: string },
+): Promise<Record<string, unknown>> {
+  const raw = await client.request("GET", withQuery(`${jobPath(job_id)}/results`, { status, limit, cursor }));
+  // The endpoint streams JSON Lines; the client hands non-JSON bodies back as `{content}`.
+  // A single-line page parses as a plain object instead.
+  let results: unknown[];
+  if (raw && typeof raw === "object" && typeof (raw as { content?: unknown }).content === "string") {
+    results = (raw as { content: string }).content
+      .split("\n")
+      .filter((l) => l.trim() !== "")
+      .map((l) => JSON.parse(l) as unknown);
+  } else if (raw && typeof raw === "object" && Object.keys(raw).length > 0) {
+    results = [raw];
+  } else {
+    results = [];
+  }
+  const out: Record<string, unknown> = { results };
+  // The cursor travels in the X-Next-Cursor header, which the client does not expose.
+  // It is the hex of the last seq, so it is recomputed here when the page was full.
+  const pageSize = limit ?? 500;
+  const last = results[results.length - 1] as { seq?: number } | undefined;
+  if (results.length === pageSize && last && typeof last.seq === "number") {
+    out.next_cursor = Buffer.from(String(last.seq)).toString("hex");
+  }
+  return out;
 }
 
 const jobId = z.string().min(1).describe("The batch job id returned by spicrawl_batch_submit or spicrawl_batch_list.");
@@ -237,32 +272,7 @@ export const registerBatchTools: RegisterTools = (server, client, { hideUnavaila
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async ({ job_id, status, limit, cursor }) =>
-      run(async () => {
-        const raw = await client.request("GET", withQuery(`${jobPath(job_id)}/results`, { status, limit, cursor }));
-        // The endpoint streams JSON Lines; the client hands non-JSON bodies back as `{content}`.
-        // A single-line page parses as a plain object instead.
-        let results: unknown[];
-        if (raw && typeof raw === "object" && typeof (raw as { content?: unknown }).content === "string") {
-          results = (raw as { content: string }).content
-            .split("\n")
-            .filter((l) => l.trim() !== "")
-            .map((l) => JSON.parse(l) as unknown);
-        } else if (raw && typeof raw === "object" && Object.keys(raw).length > 0) {
-          results = [raw];
-        } else {
-          results = [];
-        }
-        const out: Record<string, unknown> = { results };
-        // The cursor travels in the X-Next-Cursor header, which the client does not expose.
-        // It is the hex of the last seq, so it is recomputed here when the page was full.
-        const pageSize = limit ?? 500;
-        const last = results[results.length - 1] as { seq?: number } | undefined;
-        if (results.length === pageSize && last && typeof last.seq === "number") {
-          out.next_cursor = Buffer.from(String(last.seq)).toString("hex");
-        }
-        return out;
-      }),
+    async ({ job_id, status, limit, cursor }) => run(() => batchResults(client, job_id, { status, limit, cursor })),
   );
 
   // -------------------------------------------------------------------------

@@ -51,6 +51,33 @@ export const BATCH_JOB = {
   estimated_credits: 2,
 };
 
+/** A scrape JSON envelope with every internal field the API may send. */
+export const ENVELOPE_PAYLOAD = {
+  url: "https://envelope.test/", final_url: "https://envelope.test/", status: 200, content: "<h1>Hi</h1>",
+  headers: { "set-cookie": "a=b" }, truncated: false, credits: 3, engine: "chromium", proxy_source: "pool",
+  warnings: ["FORMAT_COERCED: extraction returns the JSON envelope"], data: { id: "page-own-id", title: "Hi" },
+  diagnostics: { attempts: [{ engine: "fetch", request_id: "01X" }] }, request_id: "01TESTENV00000000000000000",
+};
+
+/** A batch job as every /v1/batch endpoint reports it (api/internal/batch jobDTO). */
+export const FULL_JOB = {
+  id: "job_full", project_id: "prj_0123", name: "", status: "running", status_url: "/v1/batch/job_full",
+  results_url: "/v1/batch/job_full/results", params: { response_format: "markdown" }, total_items: 2, concurrency: 8,
+  priority: 0, max_attempts: 3, estimated_credits: 2, estimated_credits_micro: 2000000,
+  progress: { total: 2, completed: 1, succeeded: 1, failed: 0, cancelled: 0, skipped: 0, remaining: 1, percent_complete: 50,
+    credits_charged: 1, credits_charged_micro: 1000000, bytes: 120 },
+  submitted_at: "2026-10-01T00:00:00Z", started_at: "2026-10-01T00:00:01Z", results_expire_at: "2026-10-04T00:00:00Z",
+};
+
+/** Two result lines (api/internal/batch ResultRecord). */
+export const RESULT_LINES = [
+  { seq: 0, url: "https://a.test/", status: "succeeded", attempts: 1, http_status: 200, request_id: "01REQA",
+    credits_micro: 1000000, bytes: 60, duration_ms: 412, result_ref: "s3://bucket/key", result: { content: "# A", bytes: 3 },
+    result_url: "/v1/batch/job_full/tasks/0/content", finished_at: "2026-10-01T00:00:02Z" },
+  { seq: 1, url: "https://b.test/", status: "failed", attempts: 3, request_id: "01REQB", credits_micro: 0, bytes: 0,
+    duration_ms: 900, error: { code: "ERR::UPSTREAM::TIMEOUT", retryable: true }, finished_at: "2026-10-01T00:00:03Z" },
+];
+
 /**
  * A node:http server that implements only the routes the tests hit.
  * `mode` switches it between "up", "503" (every request answers 503) and
@@ -105,6 +132,30 @@ export async function startFakeApi() {
     const p = url.pathname;
     if (req.method === "GET" && p === "/v1/requests") {
       return json(200, { requests: [], page: { has_more: false, retention_hours: 24 } });
+    }
+    // The ChatGPT surface's scrape shapes. A markdown body with the status and
+    // charge in headers, and a JSON envelope full of fields that must not reach the model.
+    if (req.method === "POST" && p === "/v1/scrape" && body?.url === "https://raw.test/") {
+      res.writeHead(200, {
+        "Content-Type": "text/markdown; charset=utf-8",
+        "X-Engine": "fetch", "X-Target-Status": "200", "X-Credits-Charged": "1", "X-Request-Id": "01TESTRAW00000000000000000",
+      });
+      res.end("# Raw page\n");
+      return;
+    }
+    if (req.method === "POST" && p === "/v1/scrape" && body?.url === "https://envelope.test/") {
+      return json(200, ENVELOPE_PAYLOAD, { "X-Engine": "chromium", "X-Request-Id": "01TESTENV00000000000000000" });
+    }
+    if (req.method === "POST" && p === "/v1/batch") {
+      return json(201, { ...FULL_JOB, total_items: body?.urls?.length ?? 0 });
+    }
+    if (req.method === "GET" && p === "/v1/batch/job_full") {
+      return json(200, FULL_JOB);
+    }
+    if (req.method === "GET" && p === "/v1/batch/job_full/results") {
+      res.writeHead(200, { "Content-Type": "application/x-ndjson" });
+      res.end(RESULT_LINES.map((l) => JSON.stringify(l)).join("\n") + "\n");
+      return;
     }
     if (req.method === "POST" && p === "/v1/scrape") {
       // An API refusal that names API parameters, for the renaming test.
@@ -231,6 +282,7 @@ export async function startMcp(apiURL, env = {}) {
   return {
     base,
     mcpURL: `${base}/mcp`,
+    chatgptURL: `${base}/chatgpt/mcp`,
     stderr: () => stderr,
     async healthz() {
       const r = await fetch(`${base}/healthz`);
@@ -281,4 +333,76 @@ export async function rawPost(mcpURL, { key, sessionId, body = INITIALIZE_BODY }
   const res = await fetch(mcpURL, { method: "POST", headers, body: JSON.stringify(body) });
   const text = await res.text();
   return { res, text };
+}
+
+export const INTROSPECT_SECRET = "introspect-secret-for-tests";
+export const DEFAULT_RESOURCE = "https://mcp.spicrawl.com/chatgpt/mcp";
+
+/** An access token in the shape the authorization server issues. */
+export const oat = (name) => `spicrawl_oat_${name}_${"x".repeat(24)}`;
+
+/**
+ * A fake authorization server's introspection endpoint (POST /api/oauth/introspect).
+ * `tokens` maps an access token to the claims answered for it; anything else is
+ * `{active:false}`. A claim set may be a function, called per request.
+ */
+export async function startFakeIntrospection() {
+  const fake = { tokens: new Map(), requests: [], url: "", close: null, mode: "up" };
+  const server = createServer(async (req, res) => {
+    const chunks = [];
+    for await (const c of req) chunks.push(c);
+    const form = new URLSearchParams(Buffer.concat(chunks).toString("utf8"));
+    const token = form.get("token");
+    fake.requests.push({ method: req.method, path: req.url, auth: req.headers.authorization, contentType: req.headers["content-type"], token });
+    const send = (status, obj) => {
+      res.writeHead(status, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(obj));
+    };
+    if (fake.mode === "503") return send(503, { error: "down" });
+    if (req.method !== "POST" || req.url !== "/api/oauth/introspect") return send(404, { error: "not_found" });
+    if (req.headers.authorization !== `Bearer ${INTROSPECT_SECRET}`) return send(401, { error: "invalid_client" });
+    const claims = fake.tokens.get(token);
+    if (!claims) return send(200, { active: false });
+    send(200, typeof claims === "function" ? claims() : claims);
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  fake.url = `http://127.0.0.1:${server.address().port}`;
+  fake.count = (token) => fake.requests.filter((r) => r.token === token).length;
+  fake.close = async () => {
+    server.closeAllConnections?.();
+    await new Promise((r) => server.close(() => r()));
+  };
+  return fake;
+}
+
+/** Active claims for `api_key` on the default resource, valid for an hour unless overridden. */
+export function claims(overrides = {}) {
+  return {
+    active: true,
+    aud: DEFAULT_RESOURCE,
+    scope: "scrape batch",
+    exp: Math.floor(Date.now() / 1000) + 3600,
+    client_id: "chatgpt",
+    grant_id: "grt_1",
+    org_id: "org_1",
+    project_id: "prj_1",
+    api_key: VALID_KEY,
+    ...overrides,
+  };
+}
+
+/** A raw JSON-RPC POST to /chatgpt/mcp with `token` as bearer; parses a JSON answer. */
+export async function chatgptPost(url, { token, body = INITIALIZE_BODY, headers = {} } = {}) {
+  const h = { "Content-Type": "application/json", Accept: "application/json, text/event-stream", "Mcp-Protocol-Version": "2025-06-18", ...headers };
+  if (token) h.Authorization = `Bearer ${token}`;
+  const res = await fetch(url, { method: "POST", headers: h, body: JSON.stringify(body) });
+  const text = await res.text();
+  let json;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    json = undefined;
+  }
+  return { res, text, json };
 }

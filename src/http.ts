@@ -5,6 +5,7 @@
  *
  *   POST/GET/DELETE /mcp   MCP Streamable HTTP endpoint (Bearer auth)
  *   GET /healthz           liveness, no auth
+ *   /chatgpt/mcp and its OAuth metadata: see src/chatgpt/http.ts (off by default)
  *
  * Auth is the caller's own Spicrawl API key (`Authorization: Bearer spicrawl_live_...`);
  * every tool call runs upstream under that key. One MCP server per session, and
@@ -26,6 +27,9 @@
  *   SPICRAWL_MCP_HIDE_UNAVAILABLE  1/true/yes/on lists only what works today: no
  *                     spicrawl_browser_connect_url, no argument marked "Coming soon"
  *                     (read when a session opens; restart to change it)
+ *   SPICRAWL_CHATGPT_ENABLED, SPICRAWL_CHATGPT_RESOURCE, SPICRAWL_OAUTH_ISSUER,
+ *   SPICRAWL_OAUTH_INTROSPECT_SECRET, SPICRAWL_CHATGPT_ROOT_PRM,
+ *   SPICRAWL_OPENAI_APPS_CHALLENGE(_FILE)  the ChatGPT surface; see the README
  */
 
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
@@ -34,15 +38,16 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { ILayerClient, USER_AGENT } from "./client.js";
-import { buildServer } from "./server.js";
+import { buildServer, isTruthy } from "./server.js";
+import { KEY_RE, bearerToken, readJSON, rpcError } from "./httputil.js";
+import { chatgptConfigFromEnv, type ChatgptConfig } from "./chatgpt/oauth.js";
+import { chatgptRoutes } from "./chatgpt/http.js";
 
 const ADDR = process.env.SPICRAWL_MCP_ADDR || "127.0.0.1:8090";
 const BASE_URL = process.env.SPICRAWL_BASE_URL || "http://127.0.0.1:8080";
 const PUBLIC_BASE_URL = process.env.SPICRAWL_PUBLIC_BASE_URL || BASE_URL;
 const IDLE_MS = Number(process.env.SPICRAWL_MCP_SESSION_IDLE_MS) || 30 * 60 * 1000;
-const MAX_BODY = 4 * 1024 * 1024;
 const KEY_CHECK_TIMEOUT_MS = 5_000;
-const KEY_RE = /^spicrawl_(live|test)_[A-Za-z0-9_-]{8,}$/;
 
 interface Session {
   transport: StreamableHTTPServerTransport;
@@ -56,29 +61,9 @@ const sessions = new Map<string, Session>();
 const log = (...a: unknown[]) => console.error(new Date().toISOString(), ...a);
 const hashKey = (k: string) => createHash("sha256").update(k).digest();
 
-function rpcError(res: ServerResponse, status: number, code: number, message: string, extra: Record<string, string> = {}) {
-  if (res.headersSent) return;
-  res.writeHead(status, { "Content-Type": "application/json", ...extra });
-  res.end(JSON.stringify({ jsonrpc: "2.0", error: { code, message }, id: null }));
-}
-
 function bearer(req: IncomingMessage): string | null {
-  const h = req.headers.authorization;
-  if (!h) return null;
-  const m = /^Bearer\s+(\S+)\s*$/i.exec(h);
-  return m && KEY_RE.test(m[1]) ? m[1] : null;
-}
-
-async function readJSON(req: IncomingMessage): Promise<unknown> {
-  const chunks: Buffer[] = [];
-  let size = 0;
-  for await (const c of req) {
-    size += (c as Buffer).length;
-    if (size > MAX_BODY) throw new Error("body too large");
-    chunks.push(c as Buffer);
-  }
-  const raw = Buffer.concat(chunks).toString("utf8");
-  return raw ? JSON.parse(raw) : undefined;
+  const t = bearerToken(req);
+  return t && KEY_RE.test(t) ? t : null;
 }
 
 type KeyCheck = { ok: true } | { ok: false; status: 401 | 503; message: string };
@@ -190,6 +175,28 @@ async function handleMcp(req: IncomingMessage, res: ServerResponse) {
   await transport.handleRequest(req, res, body);
 }
 
+// The ChatGPT surface (src/chatgpt). Off unless SPICRAWL_CHATGPT_ENABLED; a
+// broken setting stops the process only when the surface is on, so a stray
+// value never takes /mcp down with it.
+let chatgptConfig: ChatgptConfig;
+try {
+  chatgptConfig = chatgptConfigFromEnv();
+} catch (err) {
+  const msg = err instanceof Error ? err.message : String(err);
+  if (isTruthy(process.env.SPICRAWL_CHATGPT_ENABLED)) {
+    log(`chatgpt: invalid configuration: ${msg}`);
+    process.exit(78);
+  }
+  log(`chatgpt: surface off; ignoring invalid configuration: ${msg}`);
+  chatgptConfig = { enabled: false, resource: "", issuer: "", introspectSecret: "", rootPrm: false, appsChallenge: "" };
+}
+if (chatgptConfig.enabled) {
+  log(`chatgpt: /chatgpt/mcp on for resource ${chatgptConfig.resource}, issuer ${chatgptConfig.issuer}` +
+    `${chatgptConfig.rootPrm ? "; metadata also at the root well-known path" : ""}`);
+  if (!chatgptConfig.introspectSecret) log("chatgpt: SPICRAWL_OAUTH_INTROSPECT_SECRET is not set; every token will be answered 503");
+}
+const chatgpt = chatgptRoutes(chatgptConfig, { baseURL: BASE_URL, publicBaseURL: PUBLIC_BASE_URL, log });
+
 const http = createServer((req, res) => {
   const path = (req.url || "/").split("?")[0];
   if (path === "/healthz" && (req.method === "GET" || req.method === "HEAD")) {
@@ -197,6 +204,7 @@ const http = createServer((req, res) => {
     res.end(req.method === "HEAD" ? undefined : JSON.stringify({ status: "ok", sessions: sessions.size }));
     return;
   }
+  if (chatgpt(req, res, path)) return;
   if (path !== "/mcp") return rpcError(res, 404, -32601, "Not found: the MCP endpoint is /mcp");
   if (!["GET", "POST", "DELETE"].includes(req.method || "")) {
     return rpcError(res, 405, -32000, "Method not allowed", { Allow: "GET, POST, DELETE" });
