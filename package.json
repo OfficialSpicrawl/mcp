@@ -1,0 +1,69 @@
+{
+  "name": "@spicrawl/mcp",
+  "version": "0.1.0",
+  "description": "Spicrawl MCP server: web scraping, structured data extraction and batch crawling as native tools for AI agents in Claude Code, Claude Desktop, Cursor, VS Code, Codex and any MCP client.",
+  "license": "Apache-2.0",
+  "author": "Spicrawl",
+  "homepage": "https://docs.spicrawl.com/docs/agents/mcp",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Spicrawl/mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Spicrawl/mcp/issues"
+  },
+  "keywords": [
+    "spicrawl",
+    "mcp",
+    "mcp-server",
+    "model-context-protocol",
+    "web-scraping",
+    "web-scraping-api",
+    "scraper",
+    "crawler",
+    "html-to-markdown",
+    "markdown",
+    "llm",
+    "ai-agents",
+    "claude",
+    "claude-code",
+    "cursor",
+    "data-extraction",
+    "headless-browser",
+    "batch-scraping"
+  ],
+  "type": "module",
+  "bin": {
+    "spicrawl-mcp": "dist/index.js",
+    "spicrawl-mcp-server": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "start:http": "node dist/http.js",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "prepublishOnly": "npm run typecheck && npm test"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "typescript": "^5.7.3"
+  }
+}

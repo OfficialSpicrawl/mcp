@@ -1,0 +1,51 @@
+# Checks every push and pull request on the Node versions the package supports
+# (engines: node >= 20). Publishing lives in release.yml, which runs the same
+# checks on Node 22 before it publishes.
+#
+# `npm test` builds dist/ first and runs the node:test suite against the real
+# dist/http.js and a fake Spicrawl API on loopback, so it needs no secrets and
+# no network beyond the npm registry.
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: install
+        run: npm ci --no-audit --no-fund
+      - name: typecheck
+        run: npm run typecheck
+      - name: test
+        run: npm test
+      # What npx runs: the packed tarball, its bin, answering --version.
+      - name: package runs
+        run: |
+          npm pack --silent
+          version="$(node -p 'require("./package.json").version')"
+          got="$(npx --yes "./spicrawl-mcp-$version.tgz" --version)"
+          [ "$got" = "$version" ] || { echo "::error::npx printed '$got', want '$version'"; exit 1; }
