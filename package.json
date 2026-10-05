@@ -1,17 +1,17 @@
 {
   "name": "@spicrawl/mcp",
   "version": "0.1.3",
-  "mcpName": "io.github.Spicrawl/mcp",
+  "mcpName": "io.github.OfficialSpicrawl/mcp",
   "description": "The Spicrawl MCP server is a Model Context Protocol server that gives AI agents in Claude Code, Claude Desktop, Cursor, VS Code, Windsurf, Gemini CLI and Codex web scraping to Markdown, structured data extraction, screenshots, browser sessions and batch scraping as 25 native tools.",
   "license": "Apache-2.0",
   "author": "Spicrawl",
   "homepage": "https://docs.spicrawl.com/agents/mcp",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Spicrawl/mcp.git"
+    "url": "git+https://github.com/OfficialSpicrawl/mcp.git"
   },
   "bugs": {
-    "url": "https://github.com/Spicrawl/mcp/issues"
+    "url": "https://github.com/OfficialSpicrawl/mcp/issues"
   },
   "keywords": [
     "spicrawl",

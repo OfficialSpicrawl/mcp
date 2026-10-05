@@ -20,11 +20,11 @@ All notable changes to `@spicrawl/mcp` are documented here. This project follows
 Documentation and package metadata only; the server and its 25 tools are unchanged.
 
 - README rewritten for npmjs.com: hosted endpoint first, one-click install links for Cursor and VS Code, per-client setup for Claude Code, Claude Desktop, Cursor, VS Code, Windsurf, Gemini CLI and Codex, tool tables by group, a "which tool to use" guide, environment variables, self-hosting, FAQ and troubleshooting. Every link is absolute so it works on npm.
-- `package.json`: `mcpName` (`io.github.Spicrawl/mcp`) for the official MCP registry, a new `description` and `keywords`, and `homepage` now points at https://docs.spicrawl.com/agents/mcp.
+- `package.json`: `mcpName` (`io.github.OfficialSpicrawl/mcp`) for the official MCP registry, a new `description` and `keywords`, and `homepage` now points at https://docs.spicrawl.com/agents/mcp.
 
 ## 0.1.0 — 2026-10-01
 
-First public release of the Spicrawl MCP server, published to npm as `@spicrawl/mcp` from https://github.com/Spicrawl/mcp with an npm provenance attestation.
+First public release of the Spicrawl MCP server, published to npm as `@spicrawl/mcp` from https://github.com/OfficialSpicrawl/mcp with an npm provenance attestation.
 
 - `npx -y @spicrawl/mcp` runs the stdio server for any MCP client (Claude Code, Claude Desktop, Cursor, VS Code, Codex, …), keyed by `SPICRAWL_API_KEY`. Installed globally, the command is `spicrawl-mcp` (`spicrawl-mcp-server` is an alias).
 - `spicrawl-mcp --http` (or `node dist/http.js`) runs the Streamable HTTP server behind the hosted endpoint at https://mcp.spicrawl.com/mcp: per-caller bearer-token auth validated against the API, sessions pinned to the key that opened them, idle-session eviction and a `/healthz` liveness route.

@@ -4,10 +4,10 @@ The Spicrawl MCP server is a Model Context Protocol server that gives AI agents 
 
 [![npm version](https://img.shields.io/npm/v/@spicrawl/mcp.svg)](https://www.npmjs.com/package/@spicrawl/mcp)
 [![npm downloads](https://img.shields.io/npm/dm/@spicrawl/mcp.svg)](https://www.npmjs.com/package/@spicrawl/mcp)
-[![license](https://img.shields.io/npm/l/@spicrawl/mcp.svg)](https://github.com/Spicrawl/mcp/blob/main/LICENSE)
-[![CI](https://github.com/Spicrawl/mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/Spicrawl/mcp/actions/workflows/ci.yml)
+[![license](https://img.shields.io/npm/l/@spicrawl/mcp.svg)](https://github.com/OfficialSpicrawl/mcp/blob/main/LICENSE)
+[![CI](https://github.com/OfficialSpicrawl/mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/OfficialSpicrawl/mcp/actions/workflows/ci.yml)
 
-**[Docs](https://docs.spicrawl.com/agents/mcp)** · **[Get an API key](https://app.spicrawl.com/signup)** · **[TypeScript SDK](https://github.com/Spicrawl/sdk)** · **[CLI](https://github.com/Spicrawl/cli)** · **[Agent plugins](https://github.com/Spicrawl/agent-plugins)** · **[Changelog](https://github.com/Spicrawl/mcp/blob/main/CHANGELOG.md)**
+**[Docs](https://docs.spicrawl.com/agents/mcp)** · **[Get an API key](https://app.spicrawl.com/signup)** · **[TypeScript SDK](https://github.com/OfficialSpicrawl/sdk)** · **[CLI](https://github.com/OfficialSpicrawl/cli)** · **[Agent plugins](https://github.com/OfficialSpicrawl/agent-plugins)** · **[Changelog](https://github.com/OfficialSpicrawl/mcp/blob/main/CHANGELOG.md)**
 
 <p>
   <a href="https://cursor.com/en/install-mcp?name=spicrawl&config=eyJ1cmwiOiJodHRwczovL21jcC5zcGljcmF3bC5jb20vbWNwIiwiaGVhZGVycyI6eyJBdXRob3JpemF0aW9uIjoiQmVhcmVyICR7ZW52OlNQSUNSQVdMX0FQSV9LRVl9In19"><img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Add Spicrawl MCP server to Cursor" height="32" /></a>
@@ -114,7 +114,7 @@ Both transports serve the same 25 `spicrawl_*` tools, and every call runs under 
 
 ### Coming soon
 
-`spicrawl_browser_connect_url` will mint a single-use CDP WebSocket URL for driving a Spicrawl-hosted browser from Puppeteer or Playwright; remote browsers are not available yet. The schemas also accept `ai_extract`, `stealth`, `extract_preset`, `premium_proxy`, `proxy_country` and `sticky_key` ahead of launch. Agents should not send them yet. To list only what works today, set `SPICRAWL_MCP_HIDE_UNAVAILABLE=1` (see [Environment variables](https://github.com/Spicrawl/mcp#environment-variables)).
+`spicrawl_browser_connect_url` will mint a single-use CDP WebSocket URL for driving a Spicrawl-hosted browser from Puppeteer or Playwright; remote browsers are not available yet. The schemas also accept `ai_extract`, `stealth`, `extract_preset`, `premium_proxy`, `proxy_country` and `sticky_key` ahead of launch. Agents should not send them yet. To list only what works today, set `SPICRAWL_MCP_HIDE_UNAVAILABLE=1` (see [Environment variables](https://github.com/OfficialSpicrawl/mcp#environment-variables)).
 
 ## Example prompts
 
@@ -156,7 +156,7 @@ To share it with a team, commit `.mcp.json` at the project root. Claude Code exp
 Or install the plugin, which bundles the MCP server and the Spicrawl agent skill:
 
 ```bash
-claude plugin marketplace add Spicrawl/agent-plugins
+claude plugin marketplace add OfficialSpicrawl/agent-plugins
 claude plugin install spicrawl@spicrawl-plugins
 ```
 
@@ -420,7 +420,7 @@ There is no single crawl tool. Scrape a page with `links: true` to get its links
 Not on `/mcp`: it accepts Spicrawl API keys only, so turn OAuth off for it in clients that try it on a `401`. The separate [ChatGPT endpoint](#chatgpt-endpoint-oauth) at `/chatgpt/mcp` takes OAuth access tokens only, when the operator turns it on.
 
 ### Should I use the MCP server, the SDK or the CLI?
-Use the MCP server when an AI agent should call Spicrawl as tools. Use [`@spicrawl/sdk`](https://github.com/Spicrawl/sdk) in your own TypeScript or JavaScript code, [`@spicrawl/cli`](https://github.com/Spicrawl/cli) in a terminal or shell script, and the [REST API](https://docs.spicrawl.com/quickstart) from any other language.
+Use the MCP server when an AI agent should call Spicrawl as tools. Use [`@spicrawl/sdk`](https://github.com/OfficialSpicrawl/sdk) in your own TypeScript or JavaScript code, [`@spicrawl/cli`](https://github.com/OfficialSpicrawl/cli) in a terminal or shell script, and the [REST API](https://docs.spicrawl.com/quickstart) from any other language.
 
 ## Troubleshooting
 
@@ -439,18 +439,18 @@ Use the MCP server when an AI agent should call Spicrawl as tools. Use [`@spicra
 
 ## Related packages
 
-- [`@spicrawl/sdk`](https://github.com/Spicrawl/sdk): the official TypeScript SDK for the Spicrawl API.
-- [`@spicrawl/cli`](https://github.com/Spicrawl/cli): the Spicrawl command-line interface.
-- [Spicrawl/agent-plugins](https://github.com/Spicrawl/agent-plugins): plugins that bundle this server and the Spicrawl skill for Claude Code, Codex, Cursor, Gemini CLI and more.
+- [`@spicrawl/sdk`](https://github.com/OfficialSpicrawl/sdk): the official TypeScript SDK for the Spicrawl API.
+- [`@spicrawl/cli`](https://github.com/OfficialSpicrawl/cli): the Spicrawl command-line interface.
+- [OfficialSpicrawl/agent-plugins](https://github.com/OfficialSpicrawl/agent-plugins): plugins that bundle this server and the Spicrawl skill for Claude Code, Codex, Cursor, Gemini CLI and more.
 
 ## Links
 
 - Documentation: [docs.spicrawl.com/agents/mcp](https://docs.spicrawl.com/agents/mcp)
 - Docs for LLMs: [docs.spicrawl.com/llms.txt](https://docs.spicrawl.com/llms.txt)
 - Dashboard and API keys: [app.spicrawl.com](https://app.spicrawl.com)
-- Issues: [github.com/Spicrawl/mcp/issues](https://github.com/Spicrawl/mcp/issues)
-- Security: [SECURITY.md](https://github.com/Spicrawl/mcp/blob/main/SECURITY.md). Never commit an API key; revoke a leaked one at [app.spicrawl.com](https://app.spicrawl.com).
+- Issues: [github.com/OfficialSpicrawl/mcp/issues](https://github.com/OfficialSpicrawl/mcp/issues)
+- Security: [SECURITY.md](https://github.com/OfficialSpicrawl/mcp/blob/main/SECURITY.md). Never commit an API key; revoke a leaked one at [app.spicrawl.com](https://app.spicrawl.com).
 
 ## License
 
-[Apache-2.0](https://github.com/Spicrawl/mcp/blob/main/LICENSE)
+[Apache-2.0](https://github.com/OfficialSpicrawl/mcp/blob/main/LICENSE)
