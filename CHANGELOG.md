@@ -3,6 +3,10 @@
 All notable changes to `@spicrawl/mcp` are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.1.4 — 2026-10-05
+
+The repository moved to https://github.com/OfficialSpicrawl/mcp, and `mcpName` is now `io.github.OfficialSpicrawl/mcp`. No code or tool changes.
+
 ## 0.1.3 — 2026-10-01
 
 - `spicrawl_scrape` on the ChatGPT endpoint (`/chatgpt/mcp`) is now annotated `readOnlyHint: true`. That surface only ever sends an HTTP GET with no method, body, headers or actions, so it cannot change anything on a site. On `/mcp` it stays not read-only, because `method` and `actions` can submit forms.
