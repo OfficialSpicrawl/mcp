@@ -15,7 +15,7 @@
 # Release: bump "version" in package.json (and package-lock.json, with
 # `npm version --no-git-tag-version X.Y.Z`), add a "## X.Y.Z — date" section
 # to CHANGELOG.md, then merge to main. The server reads its version from
-# package.json at runtime, so there is no other copy to bump. The CI publishes
+# package.json at runtime; the npm version hook also updates server.json. The CI publishes
 # that version if npm does not have it yet, and otherwise only runs the
 # checks. A prerelease version (e.g. 0.2.0-beta.1) is published under the
 # `next` dist-tag so `npx -y @spicrawl/mcp` keeps getting latest.
@@ -57,6 +57,8 @@ jobs:
           registry-url: https://registry.npmjs.org
       - name: install
         run: npm ci --no-audit --no-fund
+      - name: validate MCP registry manifest
+        run: npm run registry:validate
       - name: typecheck
         run: npm run typecheck
       # Builds dist/ and runs the suite against it.
@@ -110,3 +112,47 @@ jobs:
           case "$version" in *-*) flags+=(--prerelease) ;; esac
           gh release create "v$version" --target "$GITHUB_SHA" --title "v$version" \
             --notes-file "$RUNNER_TEMP/notes.md" "${flags[@]}"
+
+  # Run here, not on the tag/release created above: events created with
+  # GITHUB_TOKEN do not start a second workflow. Reruns also repair a missing
+  # registry entry when this version is already on npm.
+  registry:
+    needs: npm
+    if: github.repository == 'OfficialSpicrawl/mcp' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write # short-lived GitHub OIDC; no registry secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - name: validate MCP registry manifest
+        run: npm run registry:validate
+      - name: verify npm package and check registry version
+        id: registry
+        run: node scripts/registry.mjs check
+      - name: install official MCP publisher
+        if: steps.registry.outputs.publish == 'true'
+        env:
+          MCP_PUBLISHER_VERSION: v1.8.1
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/mcp-publisher"
+          cd "$RUNNER_TEMP/mcp-publisher"
+          base="https://github.com/modelcontextprotocol/registry/releases/download/$MCP_PUBLISHER_VERSION"
+          curl --fail --silent --show-error --location --retry 3 "$base/mcp-publisher_linux_amd64.tar.gz" -o mcp-publisher_linux_amd64.tar.gz
+          curl --fail --silent --show-error --location --retry 3 "$base/registry_${MCP_PUBLISHER_VERSION#v}_checksums.txt" -o checksums.txt
+          sha256sum --check --ignore-missing checksums.txt
+          tar xzf mcp-publisher_linux_amd64.tar.gz mcp-publisher
+      - name: authenticate and publish to MCP Registry
+        if: steps.registry.outputs.publish == 'true'
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/mcp-publisher/mcp-publisher" login github-oidc
+          "$RUNNER_TEMP/mcp-publisher/mcp-publisher" publish server.json
