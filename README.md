@@ -451,6 +451,47 @@ Use the MCP server when an AI agent should call Spicrawl as tools. Use [`@spicra
 - Issues: [github.com/OfficialSpicrawl/mcp/issues](https://github.com/OfficialSpicrawl/mcp/issues)
 - Security: [SECURITY.md](https://github.com/OfficialSpicrawl/mcp/blob/main/SECURITY.md). Never commit an API key; revoke a leaked one at [app.spicrawl.com](https://app.spicrawl.com).
 
+## Publishing to the MCP Registry
+
+[`server.json`](./server.json) lists both the npm/stdio package and the hosted
+Streamable HTTP endpoint under `io.github.OfficialSpicrawl/mcp`. API keys are
+requested from the person installing the server; no key belongs in the manifest.
+
+The existing `release` workflow publishes to the MCP Registry **after** its npm
+job succeeds, on pushes to `main` or manual runs from `main`. Registry authentication
+uses GitHub OIDC (`id-token: write`), so it needs no new secret, device login or DNS
+record. The npm release keeps using the existing `NPM_TOKEN` secret.
+
+For a release, run `npm version --no-git-tag-version X.Y.Z`, update the changelog,
+and submit the changes to `main`. The npm version hook synchronizes both versions
+in `server.json`. If you edit `package.json` by hand, run `npm run registry:sync`.
+CI checks the manifest against its official `$schema` with Ajv and rejects name
+or version drift before npm publication. To run that check locally:
+
+```bash
+npm ci
+npm run registry:validate
+# Offline: pass a downloaded copy of the exact server.json $schema URL.
+npm run registry:validate -- /path/to/server.schema.json
+```
+
+The registry job checks that the published npm package has the matching `mcpName`
+before publishing. An existing registry version is skipped; lookup failures stop
+the job. To retry a registry failure or list the already-published current npm
+version, run the `release` workflow on `main` again. Use a new version for metadata
+changes to an existing listing. The publisher binary is pinned and its download
+is checked against the release checksums; update its version in `release.yml`
+when upgrading the CLI.
+
+Verify publication at
+<https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.OfficialSpicrawl/mcp>.
+The workflow must be merged into `OfficialSpicrawl/mcp` before OIDC can publish
+that namespace. Fork pull requests validate and test, but never run the registry job.
+
+Official references: [publishing quickstart](https://github.com/modelcontextprotocol/registry/blob/main/docs/modelcontextprotocol-io/quickstart.mdx),
+[GitHub Actions](https://github.com/modelcontextprotocol/registry/blob/main/docs/modelcontextprotocol-io/github-actions.mdx),
+and [remote servers](https://github.com/modelcontextprotocol/registry/blob/main/docs/modelcontextprotocol-io/remote-servers.mdx).
+
 ## License
 
 [Apache-2.0](https://github.com/OfficialSpicrawl/mcp/blob/main/LICENSE)

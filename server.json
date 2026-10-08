@@ -1,0 +1,50 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.OfficialSpicrawl/mcp",
+  "title": "Spicrawl",
+  "description": "Web scraping to Markdown and structured data, screenshots, batch jobs and browser sessions.",
+  "repository": {
+    "url": "https://github.com/OfficialSpicrawl/mcp",
+    "source": "github"
+  },
+  "websiteUrl": "https://docs.spicrawl.com/agents/mcp",
+  "version": "0.1.4",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@spicrawl/mcp",
+      "version": "0.1.4",
+      "transport": { "type": "stdio" },
+      "environmentVariables": [
+        {
+          "name": "SPICRAWL_API_KEY",
+          "description": "Create a Spicrawl API key at https://app.spicrawl.com/signup.",
+          "isRequired": true,
+          "isSecret": true,
+          "format": "string"
+        }
+      ]
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.spicrawl.com/mcp",
+      "headers": [
+        {
+          "name": "Authorization",
+          "description": "Spicrawl API key authentication.",
+          "value": "Bearer {api_key}",
+          "variables": {
+            "api_key": {
+              "description": "Create an API key at https://app.spicrawl.com/signup.",
+              "isRequired": true,
+              "isSecret": true,
+              "format": "string"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

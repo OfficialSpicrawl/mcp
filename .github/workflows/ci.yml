@@ -38,6 +38,8 @@ jobs:
           cache-dependency-path: package-lock.json
       - name: install
         run: npm ci --no-audit --no-fund
+      - name: validate MCP registry manifest
+        run: npm run registry:validate
       - name: typecheck
         run: npm run typecheck
       - name: test
