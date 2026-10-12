@@ -4,12 +4,9 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { after, before, describe, test } from "node:test";
-import { connectClient, startFakeApi, startMcp } from "./helpers/harness.mjs";
+import { connectClient, forbiddenIn, startFakeApi, startMcp } from "./helpers/harness.mjs";
 
 const PKG = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
-// Written out here, not imported, so the test does not trust the code it checks.
-const INTERNAL = /moli|chromium|chrome|camoufox|obscura|browserless|headful|playwright|puppeteer/i;
-const HIDDEN_ARGUMENTS = ["engine", "headless"];
 
 let api;
 let mcp;
@@ -69,23 +66,14 @@ describe("server card", () => {
     for (const [i, tool] of card.tools.entries()) {
       assert.equal(tool.title, live[i].title);
       assert.deepEqual(tool.annotations, live[i].annotations, tool.name);
-      assert.equal(tool.inputSchema.additionalProperties, live[i].inputSchema.additionalProperties, tool.name);
-      const liveArgs = Object.keys(live[i].inputSchema.properties ?? {}).filter((a) => !HIDDEN_ARGUMENTS.includes(a));
-      assert.deepEqual(Object.keys(tool.inputSchema.properties ?? {}), liveArgs, tool.name);
-      for (const r of tool.inputSchema.required ?? []) assert.ok(liveArgs.includes(r), `${tool.name}: required ${r}`);
-      assert.ok(tool.description?.trim(), `${tool.name} keeps a description`);
-      for (const [arg, schema] of Object.entries(tool.inputSchema.properties ?? {})) {
-        if (live[i].inputSchema.properties[arg].description) assert.ok(schema.description?.trim(), `${tool.name}.${arg} keeps a description`);
-      }
+      assert.deepEqual(tool.inputSchema, live[i].inputSchema, tool.name);
+      assert.equal(tool.description, live[i].description, tool.name);
     }
   });
 
-  test("never names an internal engine and hides the arguments that pick one", async () => {
-    const text = await (await fetch(cardURL)).text();
-    assert.doesNotMatch(text, INTERNAL);
-    for (const tool of JSON.parse(text).tools) {
-      for (const a of HIDDEN_ARGUMENTS) assert.ok(!(a in (tool.inputSchema.properties ?? {})), `${tool.name} still has ${a}`);
-    }
+  test("never names an internal engine", async () => {
+    // The word list lives in test/helpers/harness.mjs only: tests are not published.
+    assert.deepEqual(forbiddenIn(await (await fetch(cardURL)).text()), []);
   });
 
   test("/mcp still needs a key", async () => {

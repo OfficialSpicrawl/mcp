@@ -5,11 +5,9 @@
  *
  * The tool list is not written by hand: it is what a real session's tools/list
  * answers, taken from the same buildServer() the endpoint uses, so the card
- * cannot drift from the tools. The one edit is a privacy filter, because the
- * card is public and the execution engines are internal: the `engine` and
- * `headless` arguments are dropped, and any sentence that still names an
- * engine or a browser tool is removed. If a name survives, the card is refused
- * (fail closed) rather than published.
+ * cannot drift from the tools. Tool definitions name no internal engine, so
+ * nothing is filtered here; test/annotations.test.mjs and test/card.test.mjs
+ * fail the build if one ever does.
  */
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -20,38 +18,6 @@ import { buildServer } from "./server.js";
 // ponytail: the hosted product's URL; a self-hosted card still names it. Add an env override if anyone self-hosts and registers.
 export const HOSTED_MCP_URL = "https://mcp.spicrawl.com/mcp";
 const DOCS_URL = "https://docs.spicrawl.com/agents/mcp";
-
-/** Names that must never appear in the public card. */
-export const INTERNAL_NAMES = /\b(moli|chromium|chrome|camoufox|obscura|browserless|headful|playwright|puppeteer)\b/i;
-
-/** Arguments that exist only to pick an internal engine or browser mode. */
-const HIDDEN_ARGUMENTS = new Set(["engine", "headless"]);
-
-/** Drops the hidden arguments, parentheticals and then sentences naming an internal tool, at any depth. */
-function scrub(node: unknown): unknown {
-  if (Array.isArray(node)) return node.map(scrub);
-  if (typeof node === "string") {
-    return node
-      .replace(/\s*\([^()]*\)/g, (aside) => (INTERNAL_NAMES.test(aside) ? "" : aside))
-      .split(/(?<=[.!?])\s+/)
-      .filter((sentence) => !INTERNAL_NAMES.test(sentence))
-      .join(" ");
-  }
-  if (node && typeof node === "object") {
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(node)) {
-      if (k === "properties" && v && typeof v === "object") {
-        out[k] = scrub(Object.fromEntries(Object.entries(v).filter(([name]) => !HIDDEN_ARGUMENTS.has(name))));
-      } else if (k === "required" && Array.isArray(v)) {
-        out[k] = v.filter((name) => !HIDDEN_ARGUMENTS.has(name));
-      } else {
-        out[k] = scrub(v);
-      }
-    }
-    return out;
-  }
-  return node;
-}
 
 /** What a session's tools/list says: the real definitions, from an in-memory client. */
 async function listTools() {
@@ -71,7 +37,7 @@ async function listTools() {
 }
 
 export async function buildServerCard() {
-  const card = {
+  return {
     serverInfo: {
       name: "Spicrawl",
       title: "Spicrawl",
@@ -81,9 +47,6 @@ export async function buildServerCard() {
     },
     transport: { type: "streamable-http", endpoint: HOSTED_MCP_URL },
     authentication: { required: true, schemes: ["bearer"] },
-    tools: scrub(await listTools()),
+    tools: await listTools(),
   };
-  const leak = INTERNAL_NAMES.exec(JSON.stringify(card));
-  if (leak) throw new Error(`server card names an internal engine (${leak[0]}); extend scrub() before publishing it`);
-  return card;
 }

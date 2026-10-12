@@ -5,7 +5,7 @@ All notable changes to `@spicrawl/mcp` are documented here. This project follows
 
 ## Unreleased
 
-- A static MCP server card at `GET /.well-known/mcp/server-card.json` on the HTTP server, so directories such as Smithery can list the server without a key (`/mcp` answers 401). It carries `serverInfo`, the streamable-http transport, bearer auth and the tool list, generated from the real tool definitions. It never names an execution engine: the arguments that pick one are left out, and a card that would name one is refused (500) instead of published. Public and cacheable for an hour. `/mcp` is unchanged.
+- A static MCP server card at `GET /.well-known/mcp/server-card.json` on the HTTP server, so directories such as Smithery can list the server without a key (`/mcp` answers 401). It carries `serverInfo`, the streamable-http transport, bearer auth and the tool list, generated from the real tool definitions. The tool definitions name no execution engine, so the card is not filtered: it is the `tools/list` of `/mcp` with `SPICRAWL_MCP_HIDE_UNAVAILABLE` on, including the session `engine` tiers (`fetch`, `js`, `browser`). A test fails if the card or any published file ever names one. Public and cacheable for an hour. `/mcp` is unchanged.
 
 Internal engine names no longer appear in the tool definitions, the README or the npm package. Customers see the public rendering tiers (`fetch`, `js`, `browser`) and nothing else.
 
