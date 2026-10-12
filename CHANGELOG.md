@@ -3,7 +3,7 @@
 All notable changes to `@spicrawl/mcp` are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 0.1.5 — 2026-10-12
 
 - A static MCP server card at `GET /.well-known/mcp/server-card.json` on the HTTP server, so directories such as Smithery can list the server without a key (`/mcp` answers 401). It carries `serverInfo`, the streamable-http transport, bearer auth and the tool list, generated from the real tool definitions. The tool definitions name no execution engine, so the card is not filtered: it is the `tools/list` of `/mcp` with `SPICRAWL_MCP_HIDE_UNAVAILABLE` on, including the session `engine` tiers (`fetch`, `js`, `browser`). A test fails if the card or any published file ever names one. Public and cacheable for an hour. `/mcp` is unchanged.
 
