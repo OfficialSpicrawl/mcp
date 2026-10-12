@@ -22,7 +22,7 @@ const ScrapeInput = {
     .default("markdown")
     .describe(
       "Output format. 'markdown' (default) is best for feeding to an LLM; 'html' returns the raw document; 'json' returns a structured envelope; " +
-        "'pdf' prints the page in a browser and returns the file as a resource content block (needs `render` or `engine: \"chromium\"`).",
+        "'pdf' prints the page in a full browser (routed there for you) and returns the file as a resource content block.",
     ),
   main_content_only: z
     .boolean()
@@ -96,13 +96,8 @@ const ScrapeInput = {
     .optional()
     .describe("Milliseconds to wait after load before capturing (render only)."),
   // --- The rest of POST /v1/scrape, under the API's own names (passed through).
-  engine: z
-    .enum(["fetch", "obscura", "chromium", "camoufox"])
-    .optional()
-    .describe("Pin the execution engine instead of letting the router choose. A pinned engine the deployment does not run is refused (ERR::ENGINE::UNAVAILABLE), never substituted. `camoufox` is coming soon: do not pin it yet."),
   mode: z.enum(["auto"]).optional().describe("Routing mode. `auto` lets the platform escalate fetch -> browser as needed, billing only the rung that worked."),
-  stealth: z.boolean().optional().describe(COMING_SOON + "Stealth mode: render in the hardened Camoufox browser. Default false."),
-  headless: z.boolean().optional().describe("false runs Chromium on a real display (1920x1080 screen). chromium engine only."),
+  stealth: z.boolean().optional().describe(COMING_SOON + "Stealth mode: render in a full browser hardened against bot detection. Default false."),
   method: z
     .string()
     .optional()
@@ -161,7 +156,7 @@ const SCRAPE_ARG_NAMES: Record<string, string> = { js_render: "render", response
 
 /** Arguments passed to the API unchanged: the tool uses the REST name. */
 const PASSTHROUGH = [
-  "engine", "mode", "stealth", "headless", "method", "custom_headers", "session_id", "sticky_key",
+  "mode", "stealth", "method", "custom_headers", "session_id", "sticky_key",
   "proxy_verify", "wait_for", "wait_for_timeout", "block_resources", "screenshot_fullpage",
   "screenshot_selector", "screenshot_format", "screenshot_quality", "autoparse", "extract_preset",
   "network_capture", "parse_pdf", "max_cost", "original_status", "allowed_status_codes",
@@ -186,9 +181,9 @@ server.registerTool(
       "can change state on the target site: set them only when the user asks for that. " +
       "For markdown, text and HTML it returns `{ content }`. With `format: \"json\"`, or when " +
       `\`extract\`, ${aiExtractKey}\`autoparse\`, \`links\`, \`screenshot\` or \`network_capture\` is set, it returns the JSON envelope: ` +
-      "`content`, the site's `status`, `credits`, `engine`, `warnings` and `data` for extraction. " +
+      "`content`, the site's `status`, `credits`, `engine` (the rendering tier: `fetch`, `js` or `browser`), `warnings` and `data` for extraction. " +
       "Screenshots come back as image content blocks; each `screenshots` entry in the JSON keeps its metadata and says which block holds it. " +
-      "A PDF comes back as a resource content block, with its size and the engine and credits in the JSON.",
+      "A PDF comes back as a resource content block, with its size, the rendering tier and the credits in the JSON.",
     inputSchema: availableOnly(ScrapeInput, hideUnavailable),
     // Not read-only, whatever the default call does: `method` accepts POST/PUT/PATCH/DELETE
     // and `actions` can click, fill and run scripts on the target page, so a call can submit

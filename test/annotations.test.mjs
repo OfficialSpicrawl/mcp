@@ -4,9 +4,10 @@
 // yet, and the wording of what a tool tells the model.
 
 import assert from "node:assert/strict";
+import { readFileSync, readdirSync } from "node:fs";
 import { after, before, describe, test } from "node:test";
 import { hideUnavailableFromEnv } from "../dist/server.js";
-import { QUOTA_DETAIL, QUOTA_DOC_URL, connectClient, startFakeApi, startMcp } from "./helpers/harness.mjs";
+import { QUOTA_DETAIL, QUOTA_DOC_URL, connectClient, forbiddenIn, startFakeApi, startMcp } from "./helpers/harness.mjs";
 
 // The value of every hint, with the reason. Change a row only with its reason.
 //
@@ -160,6 +161,38 @@ describe("what tools say about themselves", () => {
         assert.doesNotMatch(d, bad, `${t.name}: ${d.slice(0, 120)}`);
       }
     }
+  });
+
+  test("tools/list names no internal engine or browser tooling, in either listing", () => {
+    // The whole listing (names, titles, descriptions, every schema), not just the descriptions.
+    assert.deepEqual(forbiddenIn(tools), [], "default listing");
+    assert.deepEqual(forbiddenIn(hiddenTools), [], "SPICRAWL_MCP_HIDE_UNAVAILABLE=1 listing");
+  });
+
+  test("the files npm publishes (dist, README, CHANGELOG, package.json, server.json) name none either", () => {
+    const root = new URL("../", import.meta.url);
+    const files = [
+      // dist/card.js is the server card's deny-list: it has to spell the names it filters out.
+      ...readdirSync(new URL("dist/", root), { recursive: true })
+        .filter((f) => f.endsWith(".js") && f !== "card.js")
+        .map((f) => `dist/${f}`),
+      "README.md", "CHANGELOG.md", "package.json", "server.json",
+    ];
+    assert.ok(files.length > 4, "no dist files found: did the build run?");
+    for (const f of files) assert.deepEqual(forbiddenIn(readFileSync(new URL(f, root), "utf8")), [], f);
+  });
+
+  test("the only engine choices left are the public rendering tiers", () => {
+    const listed = byName(tools);
+    for (const name of ["spicrawl_scrape", "spicrawl_batch_submit", "spicrawl_batch_add_items"]) {
+      const props = listed[name].inputSchema.properties;
+      assert.ok(!("engine" in props) && !("headless" in props), `${name} still takes engine or headless`);
+    }
+    assert.deepEqual(listed.spicrawl_session_create.inputSchema.properties.engine.enum, ["fetch", "js", "browser"]);
+    assert.deepEqual(listed.spicrawl_session_list.inputSchema.properties.engine.enum, ["fetch", "js", "browser"]);
+    const connect = listed[BROWSER].inputSchema.properties;
+    assert.deepEqual(connect.engine.enum, ["browser", "js"]);
+    assert.ok(!("headless" in connect), "the browser tool still takes headless");
   });
 
   test("the scrape description does not claim a `meta` object the API does not return", () => {

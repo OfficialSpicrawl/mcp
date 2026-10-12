@@ -16,7 +16,8 @@ const force = z
   .optional()
   .describe("Break an active lease (a scrape currently using the session). Only set when you know it is safe.");
 
-const engines = ["fetch", "obscura", "chromium", "camoufox"] as const;
+// The rendering tiers a session can be bound to (the API's public names).
+const engines = ["fetch", "js", "browser"] as const;
 
 // Sessions: /v1/sessions.
 export const registerSessionsTools: RegisterTools = (server, client, { hideUnavailable }) => {
@@ -28,17 +29,17 @@ export const registerSessionsTools: RegisterTools = (server, client, { hideUnava
     {
       title: "Create a browsing session",
       description:
-        "Create a session: a persistent browser identity (cookie jar, localStorage, pinned engine and, by default, a " +
+        "Create a session: a persistent browser identity (cookie jar, localStorage, a fixed rendering tier and, by default, a " +
         "sticky exit IP) that survives across scrapes. Use it for multi-step flows — log in, then fetch pages behind " +
         "the login — by passing the returned `id` as `session_id` to every `spicrawl_scrape` call that should share the " +
-        "state. The engine is pinned for the session's lifetime. Without `engine`, the server picks one this deployment " +
-        "runs: `obscura`, else `chromium`, else `fetch`. Release the session with `spicrawl_session_release` when done. " +
+        "state. The rendering tier is fixed for the session's lifetime and every scrape on the session runs on it. Leave " +
+        "`engine` out and one is chosen for you. Release the session with `spicrawl_session_release` when done. " +
         "Returns the session object (id, engine, status, sticky_key, proxy, expires_at).",
       inputSchema: availableOnly({
         engine: z
           .enum(engines)
           .optional()
-          .describe("Engine pinned for the session's lifetime. Default: `obscura` if deployed, else `chromium`, else `fetch`. `camoufox` is coming soon: do not pin it yet."),
+          .describe("Rendering tier fixed for the session's lifetime. Optional: leave it out and one is chosen for you. `fetch` is plain HTTP; `js` is JavaScript rendering and refuses `actions`, `block_resources`, screenshots and PDFs; `browser` is a full browser."),
         ttl_seconds: z
           .number()
           .int()
@@ -63,7 +64,7 @@ export const registerSessionsTools: RegisterTools = (server, client, { hideUnava
         fingerprint: z
           .record(z.unknown())
           .optional()
-          .describe(COMING_SOON + "Camoufox fingerprint pin, stored verbatim. Only valid with engine `camoufox`."),
+          .describe(COMING_SOON + "Browser fingerprint pin, stored verbatim. Needs a full-browser session (`engine: \"browser\"`)."),
         domain_scores: z
           .record(
             z.object({
@@ -104,7 +105,7 @@ export const registerSessionsTools: RegisterTools = (server, client, { hideUnava
         "`next_cursor` back as `cursor` for the next page. Never includes the stored credentials.",
       inputSchema: {
         status: z.enum(["active", "released", "expired"]).optional().describe("Only sessions in this state."),
-        engine: z.enum(engines).optional().describe("Only sessions pinned to this engine."),
+        engine: z.enum(engines).optional().describe("Only sessions on this rendering tier."),
         limit: z.number().int().min(1).max(200).optional().describe("Page size (default 50, max 200)."),
         cursor: z.string().optional().describe("`next_cursor` from a previous page, verbatim."),
       },
@@ -122,7 +123,7 @@ export const registerSessionsTools: RegisterTools = (server, client, { hideUnava
     {
       title: "Get a session",
       description:
-        "Return one session's metadata: status, engine, proxy/exit, usage count, expiry, lease holder, and a summary " +
+        "Return one session's metadata: status, `engine` (its rendering tier), proxy/exit, usage count, expiry, lease holder, and a summary " +
         "of its stored context. Never returns the credentials themselves (use spicrawl_session_context for that).",
       inputSchema: { session_id: sessionId },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },

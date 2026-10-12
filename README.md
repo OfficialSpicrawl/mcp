@@ -40,12 +40,12 @@ Both transports serve the same 25 `spicrawl_*` tools, and every call runs under 
 ## What it does
 
 - **Scrape any URL to Markdown**, text, HTML, a JSON envelope or a printed PDF with one tool, `spicrawl_scrape`. Markdown is the default and strips the page to its main content.
-- **Render JavaScript** with `render: true` (the `obscura` browser engine, 3 credits) or pin real Chromium with `engine: "chromium"` (8 credits). A plain fetch costs 1 credit, and `mode: "auto"` escalates fetch to browser and bills only the rung that worked ([price table](https://docs.spicrawl.com/credits)).
+- **Render JavaScript** with `render: true` (3 credits). A plain fetch costs 1 credit, screenshots, PDFs and `actions` use a full browser (8 credits), and `mode: "auto"` escalates from fetch to browser and bills only the rung that worked ([price table](https://docs.spicrawl.com/credits)). You never pick the rendering yourself; Spicrawl chooses the cheapest that can do what the request asks.
 - **Extract structured data** with a CSS/XPath selector map (`extract`) or from the JSON-LD, OpenGraph, Twitter Card and microdata a page publishes (`autoparse`).
 - **Drive the page** before capture with 8 typed browser actions: `click`, `fill`, `wait_for`, `wait_for_navigation`, `scroll` (including infinite scroll), `select`, `evaluate` and `screenshot`.
 - **Return screenshots and PDFs the model can see**: screenshots arrive as MCP image blocks (up to 5 MB of base64 each) and printed pages as `application/pdf` resource blocks (up to 10 MB).
 - **Batch scrape thousands of URLs** as one async job, up to 10,000 items per call, with 9 tools to submit, poll, page through results, retry, cancel and keep a job open for crawling.
-- **Keep a logged-in browser** with persistent sessions: cookies, storage and a pinned engine reused across scrapes.
+- **Keep a logged-in browser** with persistent sessions: cookies, storage and a fixed rendering tier reused across scrapes.
 - **Answer "what did that cost?"** from usage and request-log tools, and **read the Spicrawl docs** from inside the agent.
 
 ## Which tool to use
@@ -67,7 +67,7 @@ Both transports serve the same 25 `spicrawl_*` tools, and every call runs under 
 
 | Tool | What it does | Key parameters |
 |---|---|---|
-| `spicrawl_scrape` | Retrieve one URL as `markdown` (default), `text`, `html`, `json` or `pdf`, with optional rendering, extraction, links, screenshots and browser actions. | `url`, `format`, `render`, `engine`, `mode`, `main_content_only`, `include_tags`, `exclude_tags`, `extract`, `autoparse`, `links`, `screenshot`, `actions`, `wait_for`, `session_id`, `proxy`, `cache`, `max_cost` |
+| `spicrawl_scrape` | Retrieve one URL as `markdown` (default), `text`, `html`, `json` or `pdf`, with optional rendering, extraction, links, screenshots and browser actions. | `url`, `format`, `render`, `mode`, `main_content_only`, `include_tags`, `exclude_tags`, `extract`, `autoparse`, `links`, `screenshot`, `actions`, `wait_for`, `session_id`, `proxy`, `cache`, `max_cost` |
 
 ### Batch scrape many URLs
 
@@ -87,9 +87,9 @@ Both transports serve the same 25 `spicrawl_*` tools, and every call runs under 
 
 | Tool | What it does | Key parameters |
 |---|---|---|
-| `spicrawl_session_create` | Create a persistent browser identity (cookies, storage, pinned engine). | `engine`, `ttl_seconds`, `session_context` |
+| `spicrawl_session_create` | Create a persistent browser identity (cookies, storage, a fixed rendering tier). | `engine`, `ttl_seconds`, `session_context` |
 | `spicrawl_session_list` | List sessions, newest first. | `status`, `engine`, `limit`, `cursor` |
-| `spicrawl_session_get` | One session's status, engine, exit, usage and expiry. | `session_id` |
+| `spicrawl_session_get` | One session's status, rendering tier, exit, usage and expiry. | `session_id` |
 | `spicrawl_session_context` | Dump a live session's cookies and storage (contains secrets). | `session_id` |
 | `spicrawl_session_release` | End a session; its record stays as `released`. | `session_id` |
 | `spicrawl_session_delete` | Permanently delete a session and its state. | `session_id` |
@@ -101,7 +101,7 @@ Both transports serve the same 25 `spicrawl_*` tools, and every call runs under 
 | `spicrawl_usage` | Billing-grade usage over a date window (`read` scope). | `from`, `to`, `group_by`, `metrics` |
 | `spicrawl_usage_summary` | Current-period totals (`read` scope). | none |
 | `spicrawl_usage_reconciliation` | One day's drift between the request log and the billed rollup (`read` scope). | `day` |
-| `spicrawl_requests_list` | Recent API calls with status, error code, engine, latency and credits. | `only_errors`, `status`, `limit`, `all_projects` |
+| `spicrawl_requests_list` | Recent API calls with status, error code, rendering tier, latency and credits. | `only_errors`, `status`, `limit`, `all_projects` |
 | `spicrawl_request_get` | The full log record of one call. | `id` |
 
 ### Docs
@@ -114,7 +114,7 @@ Both transports serve the same 25 `spicrawl_*` tools, and every call runs under 
 
 ### Coming soon
 
-`spicrawl_browser_connect_url` will mint a single-use CDP WebSocket URL for driving a Spicrawl-hosted browser from Puppeteer or Playwright; remote browsers are not available yet. The schemas also accept `ai_extract`, `stealth`, `extract_preset`, `premium_proxy`, `proxy_country` and `sticky_key` ahead of launch. Agents should not send them yet. To list only what works today, set `SPICRAWL_MCP_HIDE_UNAVAILABLE=1` (see [Environment variables](https://github.com/OfficialSpicrawl/mcp#environment-variables)).
+`spicrawl_browser_connect_url` will mint a single-use CDP WebSocket URL for driving a Spicrawl-hosted browser from any CDP client; remote browsers are not available yet. The schemas also accept `ai_extract`, `stealth`, `extract_preset`, `premium_proxy`, `proxy_country` and `sticky_key` ahead of launch. Agents should not send them yet. To list only what works today, set `SPICRAWL_MCP_HIDE_UNAVAILABLE=1` (see [Environment variables](https://github.com/OfficialSpicrawl/mcp#environment-variables)).
 
 ## Example prompts
 
@@ -335,7 +335,7 @@ A stdio-only client runs `npx -y @spicrawl/mcp` with `SPICRAWL_API_KEY` in its e
 | `SPICRAWL_DOCS_HOST` | none | both | Legacy: an origin whose docs are at `/docs`. Read only when `SPICRAWL_DOCS_URL` is unset. |
 | `SPICRAWL_MCP_ADDR` | `127.0.0.1:8090` | HTTP | Listen address, `host:port`. |
 | `SPICRAWL_MCP_SESSION_IDLE_MS` | `1800000` (30 min) | HTTP | Idle MCP sessions are dropped after this long. |
-| `SPICRAWL_MCP_HIDE_UNAVAILABLE` | off | both | `1`, `true`, `yes` or `on` leaves out what is announced but not available yet: `spicrawl_browser_connect_url` is not registered (24 tools) and every argument marked "Coming soon" is dropped from the schemas (`ai_extract`, `stealth`, `extract_preset`, `premium_proxy`, `proxy_country`, `sticky_key`, and the session `rotate_ip`, `region_pool` and `fingerprint`). The `camoufox` engine value stays in the `engine` enums. Read when the server starts a session, so restart the process after changing it. |
+| `SPICRAWL_MCP_HIDE_UNAVAILABLE` | off | both | `1`, `true`, `yes` or `on` leaves out what is announced but not available yet: `spicrawl_browser_connect_url` is not registered (24 tools) and every argument marked "Coming soon" is dropped from the schemas (`ai_extract`, `stealth`, `extract_preset`, `premium_proxy`, `proxy_country`, `sticky_key`, and the session `rotate_ip`, `region_pool` and `fingerprint`). Read when the server starts a session, so restart the process after changing it. |
 | `SPICRAWL_CHATGPT_ENABLED` | off | HTTP | `1`, `true`, `yes` or `on` turns on the [ChatGPT endpoint](#chatgpt-endpoint-oauth). Off, `/chatgpt/mcp`, its metadata and the OpenAI challenge all answer `404`. |
 | `SPICRAWL_CHATGPT_RESOURCE` | `https://mcp.spicrawl.com/chatgpt/mcp` | HTTP | The OAuth resource identifier. Tokens must be issued for exactly this `aud`; the metadata is published at `/.well-known/oauth-protected-resource` + its path. |
 | `SPICRAWL_OAUTH_ISSUER` | `https://app.spicrawl.com` | HTTP | The authorization server, listed in the metadata. Tokens are introspected at `<issuer>/api/oauth/introspect`. |
@@ -358,7 +358,7 @@ npx -y @spicrawl/mcp --http
 
 - `SPICRAWL_BASE_URL` **defaults to `http://127.0.0.1:8080`** in HTTP mode (a Spicrawl API on the same host), not to the public API. Set it to `https://api.spicrawl.com` to front the public API.
 - MCP is served at `POST`/`GET`/`DELETE /mcp`; liveness at `GET /healthz` (no auth).
-- `GET /.well-known/mcp/server-card.json` (no auth, `Cache-Control: public, max-age=3600`) is a static server card for directories such as Smithery that cannot scan `/mcp` without a key: `serverInfo`, the transport, bearer auth and the tool list. The tools are read from the same definitions as `tools/list` (as with `SPICRAWL_MCP_HIDE_UNAVAILABLE`), and the card leaves out the `engine` and `headless` arguments and any sentence that names an execution engine.
+- `GET /.well-known/mcp/server-card.json` (no auth, `Cache-Control: public, max-age=3600`) is a static server card for directories such as Smithery that cannot scan `/mcp` without a key: `serverInfo`, the transport, bearer auth and the tool list. The tools are read from the same definitions as `tools/list` (as with `SPICRAWL_MCP_HIDE_UNAVAILABLE`), and the card leaves out the arguments that pick an execution engine and any sentence that names one.
 - Each caller sends their own key as `Authorization: Bearer spicrawl_live_...`. The key is checked against the API before a session opens (`401` if refused, `503` with `Retry-After` if the API cannot be reached), and a session is pinned to the key that opened it.
 - The server speaks plain HTTP. Put it behind TLS before sending keys across a network.
 
@@ -409,7 +409,7 @@ Yes: `https://mcp.spicrawl.com/mcp`, MCP Streamable HTTP, authenticated with `Au
 Spicrawl bills credits per successful request, and during the beta every organization gets one plan of 1,000 credits per month. Failed requests cost 0 credits; a cache hit is billed at the same price as the fetch that stored it. See [Credits](https://docs.spicrawl.com/credits).
 
 ### Does it render JavaScript?
-Yes. Set `render: true` on `spicrawl_scrape` to run the page in a browser, or `mode: "auto"` to let Spicrawl escalate from a plain fetch only when needed.
+Yes. Set `render: true` on `spicrawl_scrape` to run the page in a browser, or `mode: "auto"` to let Spicrawl escalate from a plain fetch only when needed. There is no argument to choose the rendering on `spicrawl_scrape` or the batch tools: Spicrawl picks it for each request and bills the tier that served it (`fetch`, `js` or `browser`, reported as `engine` in the JSON result).
 
 ### Does it work with Claude Code, Cursor and VS Code?
 Yes, and with Claude Desktop, Windsurf, Gemini CLI, Codex and any client that speaks MCP Streamable HTTP with custom headers or launches stdio servers.

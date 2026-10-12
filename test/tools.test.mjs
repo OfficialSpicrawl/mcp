@@ -149,7 +149,7 @@ describe("pdf", () => {
     assert.ok(Buffer.from(res.content[1].resource.blob, "base64").equals(PDF_BYTES));
 
     const meta = res.structuredContent;
-    assert.equal(meta.engine, "chromium");
+    assert.equal(meta.engine, "browser");
     assert.equal(meta.credits, 8);
     assert.equal(meta.status, 200);
     // The API sends X-Request-Id; it is a diagnostic identifier nobody asked for, so it is not passed on.

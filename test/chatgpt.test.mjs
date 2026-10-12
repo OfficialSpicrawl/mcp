@@ -18,6 +18,7 @@ import {
   chatgptPost,
   claims,
   connectClient,
+  forbiddenIn,
   oat,
   rawPost,
   startFakeApi,
@@ -314,6 +315,10 @@ describe("the restricted tool profile", () => {
     }
   });
 
+  test("tools/list names no internal engine or browser tooling", () => {
+    assert.deepEqual(forbiddenIn(tools), []);
+  });
+
   test("tools/list snapshot: strict schemas with exactly the allowed arguments", () => {
     for (const [name, [props, required]] of Object.entries(ARGS)) {
       const s = tools[name].inputSchema;
@@ -338,7 +343,7 @@ describe("the restricted tool profile", () => {
   test("forbidden arguments are refused, never dropped", async () => {
     const forbidden = {
       method: "POST", actions: [{ type: "click", selector: "a" }], proxy: "http://p:1", session_id: "s",
-      engine: "chromium", stealth: true, impersonate: true, premium_proxy: true, proxy_country: "us",
+      engine: "browser", stealth: true, impersonate: true, premium_proxy: true, proxy_country: "us",
       custom_headers: { a: "b" }, ai_extract: { prompt: "x" }, screenshot: true,
     };
     const before = api.requests.length;

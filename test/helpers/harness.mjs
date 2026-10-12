@@ -26,6 +26,25 @@ export const INVALID_KEY_PROBLEM = {
   retryable: false,
 };
 
+// Words that name our rendering engines or the browser tooling behind them. Customers see the
+// public tiers (fetch, js, browser) and never these, so no tools/list output may contain one.
+// Substring match, case-insensitive: "Chromium", "headless-browser" and "PlayWright" all count.
+export const FORBIDDEN_WORDS = [
+  "moli", "chromium", "chrome", "camoufox", "obscura", "browserless", "headful", "headless", "playwright", "puppeteer",
+];
+
+/** The forbidden words found in `value` (any JSON-serialisable value), each with a snippet of context. */
+export function forbiddenIn(value) {
+  const text = typeof value === "string" ? value : JSON.stringify(value);
+  const found = [];
+  for (const word of FORBIDDEN_WORDS) {
+    for (const m of text.matchAll(new RegExp(word, "gi"))) {
+      found.push(`${word}: ...${text.slice(Math.max(0, m.index - 40), m.index + word.length + 40)}...`);
+    }
+  }
+  return found;
+}
+
 export const MARKDOWN_PAYLOAD = '# Pricing\n\nThe "Pro" plan:\n\n- 10 000 credits\n- *priority* queue\n';
 export const ARRAY_PAYLOAD = [{ title: "one", price: 1 }, { title: "two", price: 2 }];
 // A real 1x1 PNG, so a client that decodes the image block gets a valid picture.
@@ -54,7 +73,7 @@ export const BATCH_JOB = {
 /** A scrape JSON envelope with every internal field the API may send. */
 export const ENVELOPE_PAYLOAD = {
   url: "https://envelope.test/", final_url: "https://envelope.test/", status: 200, content: "<h1>Hi</h1>",
-  headers: { "set-cookie": "a=b" }, truncated: false, credits: 3, engine: "chromium", proxy_source: "pool",
+  headers: { "set-cookie": "a=b" }, truncated: false, credits: 3, engine: "browser", proxy_source: "pool",
   warnings: ["FORMAT_COERCED: extraction returns the JSON envelope"], data: { id: "page-own-id", title: "Hi" },
   diagnostics: { attempts: [{ engine: "fetch", request_id: "01X" }] }, request_id: "01TESTENV00000000000000000",
 };
@@ -144,7 +163,7 @@ export async function startFakeApi() {
       return;
     }
     if (req.method === "POST" && p === "/v1/scrape" && body?.url === "https://envelope.test/") {
-      return json(200, ENVELOPE_PAYLOAD, { "X-Engine": "chromium", "X-Request-Id": "01TESTENV00000000000000000" });
+      return json(200, ENVELOPE_PAYLOAD, { "X-Engine": "browser", "X-Request-Id": "01TESTENV00000000000000000" });
     }
     if (req.method === "POST" && p === "/v1/batch") {
       return json(201, { ...FULL_JOB, total_items: body?.urls?.length ?? 0 });
@@ -200,7 +219,7 @@ export async function startFakeApi() {
         const bytes = body.url === "https://huge-pdf.test/" ? OVERSIZED_PDF : PDF_BYTES;
         res.writeHead(200, {
           "Content-Type": "application/pdf",
-          "X-Engine": "chromium", "X-Credits-Charged": "8", "X-Target-Status": "200",
+          "X-Engine": "browser", "X-Credits-Charged": "8", "X-Target-Status": "200",
           "X-Final-Url": body.url, "X-Request-Id": "01TESTPDF0000000000000000",
         });
         res.end(bytes);
@@ -216,7 +235,7 @@ export async function startFakeApi() {
           body.screenshot_selector === "#huge"
             ? [shot(OVERSIZED_B64), shot(PNG_1X1)]
             : [shot(PNG_1X1, { width: 1, height: 1 })];
-        return json(200, { url: body.url, status: 200, content: "<html>Example</html>", engine: "chromium", credits: 8, screenshots }, { "X-Engine": "chromium" });
+        return json(200, { url: body.url, status: 200, content: "<html>Example</html>", engine: "browser", credits: 8, screenshots }, { "X-Engine": "browser" });
       }
       return json(200, { content: "# Example Domain\n", meta: { engine: "fetch", status: 200, credits: 1 } }, { "X-Engine": "fetch" });
     }
