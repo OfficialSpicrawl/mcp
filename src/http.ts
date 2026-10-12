@@ -5,6 +5,7 @@
  *
  *   POST/GET/DELETE /mcp   MCP Streamable HTTP endpoint (Bearer auth)
  *   GET /healthz           liveness, no auth
+ *   GET /.well-known/mcp/server-card.json  static server card for directories (src/card.ts), no auth
  *   /chatgpt/mcp and its OAuth metadata: see src/chatgpt/http.ts (off by default)
  *
  * Auth is the caller's own Spicrawl API key (`Authorization: Bearer spicrawl_live_...`);
@@ -42,6 +43,7 @@ import { buildServer, isTruthy } from "./server.js";
 import { KEY_RE, bearerToken, readJSON, rpcError } from "./httputil.js";
 import { chatgptConfigFromEnv, type ChatgptConfig } from "./chatgpt/oauth.js";
 import { chatgptRoutes } from "./chatgpt/http.js";
+import { buildServerCard } from "./card.js";
 
 const ADDR = process.env.SPICRAWL_MCP_ADDR || "127.0.0.1:8090";
 const BASE_URL = process.env.SPICRAWL_BASE_URL || "http://127.0.0.1:8080";
@@ -197,8 +199,34 @@ if (chatgptConfig.enabled) {
 }
 const chatgpt = chatgptRoutes(chatgptConfig, { baseURL: BASE_URL, publicBaseURL: PUBLIC_BASE_URL, log });
 
+// Built on first request and kept: it only changes with a new release. A failed
+// build is not kept, so the next request tries again.
+let serverCard: Promise<string> | undefined;
+
+async function handleCard(req: IncomingMessage, res: ServerResponse) {
+  try {
+    serverCard ??= buildServerCard().then((c) => JSON.stringify(c));
+    const body = await serverCard;
+    res.writeHead(200, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "public, max-age=3600",
+      "Access-Control-Allow-Origin": "*",
+    });
+    res.end(req.method === "HEAD" ? undefined : body);
+  } catch (err) {
+    serverCard = undefined;
+    log("server card failed:", err instanceof Error ? err.message : String(err));
+    rpcError(res, 500, -32603, "Internal error");
+  }
+}
+
 const http = createServer((req, res) => {
   const path = (req.url || "/").split("?")[0];
+  if (path === "/.well-known/mcp/server-card.json") {
+    if (req.method === "GET" || req.method === "HEAD") void handleCard(req, res);
+    else rpcError(res, 405, -32000, "Method not allowed", { Allow: "GET, HEAD" });
+    return;
+  }
   if (path === "/healthz" && (req.method === "GET" || req.method === "HEAD")) {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(req.method === "HEAD" ? undefined : JSON.stringify({ status: "ok", sessions: sessions.size }));
