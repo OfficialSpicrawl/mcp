@@ -172,9 +172,8 @@ describe("what tools say about themselves", () => {
   test("the files npm publishes (dist, README, CHANGELOG, package.json, server.json) name none either", () => {
     const root = new URL("../", import.meta.url);
     const files = [
-      // dist/card.js is the server card's deny-list: it has to spell the names it filters out.
       ...readdirSync(new URL("dist/", root), { recursive: true })
-        .filter((f) => f.endsWith(".js") && f !== "card.js")
+        .filter((f) => f.endsWith(".js"))
         .map((f) => `dist/${f}`),
       "README.md", "CHANGELOG.md", "package.json", "server.json",
     ];

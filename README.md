@@ -358,7 +358,7 @@ npx -y @spicrawl/mcp --http
 
 - `SPICRAWL_BASE_URL` **defaults to `http://127.0.0.1:8080`** in HTTP mode (a Spicrawl API on the same host), not to the public API. Set it to `https://api.spicrawl.com` to front the public API.
 - MCP is served at `POST`/`GET`/`DELETE /mcp`; liveness at `GET /healthz` (no auth).
-- `GET /.well-known/mcp/server-card.json` (no auth, `Cache-Control: public, max-age=3600`) is a static server card for directories such as Smithery that cannot scan `/mcp` without a key: `serverInfo`, the transport, bearer auth and the tool list. The tools are read from the same definitions as `tools/list` (as with `SPICRAWL_MCP_HIDE_UNAVAILABLE`), and the card leaves out the arguments that pick an execution engine and any sentence that names one.
+- `GET /.well-known/mcp/server-card.json` (no auth, `Cache-Control: public, max-age=3600`) is a static server card for directories such as Smithery that cannot scan `/mcp` without a key: `serverInfo`, the transport, bearer auth and the tool list. The tools are read from the same definitions as `tools/list` (as with `SPICRAWL_MCP_HIDE_UNAVAILABLE`), so it matches what an authenticated client sees.
 - Each caller sends their own key as `Authorization: Bearer spicrawl_live_...`. The key is checked against the API before a session opens (`401` if refused, `503` with `Retry-After` if the API cannot be reached), and a session is pinned to the key that opened it.
 - The server speaks plain HTTP. Put it behind TLS before sending keys across a network.
 
