@@ -5,7 +5,16 @@ All notable changes to `@spicrawl/mcp` are documented here. This project follows
 
 ## Unreleased
 
-- A static MCP server card at `GET /.well-known/mcp/server-card.json` on the HTTP server, so directories such as Smithery can list the server without a key (`/mcp` answers 401). It carries `serverInfo`, the streamable-http transport, bearer auth and the tool list, generated from the real tool definitions. It never names an execution engine: the `engine` and `headless` arguments are left out, and a card that would name one is refused (500) instead of published. Public and cacheable for an hour. `/mcp` is unchanged.
+- A static MCP server card at `GET /.well-known/mcp/server-card.json` on the HTTP server, so directories such as Smithery can list the server without a key (`/mcp` answers 401). It carries `serverInfo`, the streamable-http transport, bearer auth and the tool list, generated from the real tool definitions. It never names an execution engine: the arguments that pick one are left out, and a card that would name one is refused (500) instead of published. Public and cacheable for an hour. `/mcp` is unchanged.
+
+Internal engine names no longer appear in the tool definitions, the README or the npm package. Customers see the public rendering tiers (`fetch`, `js`, `browser`) and nothing else.
+
+- **Breaking:** `engine` and its display-mode flag are no longer arguments of `spicrawl_scrape`, and `engine` is no longer an argument of `spicrawl_batch_submit` and `spicrawl_batch_add_items`. The API ignored them (it answers with an `ENGINE_IGNORED` warning), because it chooses the rendering itself. A call that still sends one is refused with an "unknown argument" error; drop it.
+- **Breaking:** `engine` on `spicrawl_session_create` and `spicrawl_session_list` now takes the public tiers `fetch`, `js` or `browser`. On create it is optional and fixed for the session's life; leave it out and one is chosen for you.
+- **Breaking:** `spicrawl_browser_connect_url` takes `engine` of `browser` (default) or `js`, and no longer takes the display-mode flag: the API chooses it. Its result no longer carries ready-made connect snippets for particular client libraries; use the returned `url` as the browser WebSocket endpoint of any CDP client. The tool is still coming soon.
+- Descriptions no longer name an internal engine or a browser library. `format: "pdf"` is described as printed in a full browser, routed there for you (it needs no `render` or `engine`).
+- README, the `package.json` keywords and the examples follow.
+- A new test fails if the whole `tools/list` output (names, titles, descriptions, schemas) of `/mcp`, with and without `SPICRAWL_MCP_HIDE_UNAVAILABLE`, or of `/chatgpt/mcp`, names an internal engine or browser tooling.
 
 ## 0.1.4 — 2026-10-05
 

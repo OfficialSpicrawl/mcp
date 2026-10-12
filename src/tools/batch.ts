@@ -52,15 +52,6 @@ const jobId = z.string().min(1).describe("The batch job id returned by spicrawl_
 // every item of the job (an item in `items` may override any of them).
 const sharedParams = {
   render: z.boolean().optional().describe("Render every URL with a browser (`js_render`)."),
-  // Batch can pin only these three: its worker picks the render engine from
-  // capability flags and has no way to name chromium, so the API refuses a
-  // chromium pin (use `render: true`, or spicrawl_scrape to pin chromium).
-  engine: z
-    .enum(["fetch", "obscura", "camoufox"])
-    .optional()
-    .describe(
-      "Pin the scrape engine for every item: `fetch` or `obscura` (must be allowed by the plan and served by the deployment); `camoufox` is coming soon, do not pin it yet. `chromium` cannot be pinned in a batch — use `render: true`, or spicrawl_scrape.",
-    ),
   format: z
     .enum(["markdown", "text", "html", "json"])
     .optional()
@@ -91,7 +82,6 @@ const sharedParams = {
 
 type SharedInput = {
   render?: boolean;
-  engine?: string;
   format?: string;
   main_content_only?: boolean;
   premium_proxy?: boolean;
@@ -106,7 +96,6 @@ type SharedInput = {
 function sharedBody(input: SharedInput): Record<string, unknown> {
   const b: Record<string, unknown> = {};
   if (input.render !== undefined) b.js_render = input.render;
-  if (input.engine !== undefined) b.engine = input.engine;
   if (input.format !== undefined) b.response_format = input.format;
   if (input.main_content_only !== undefined) b.main_content_only = input.main_content_only;
   if (input.premium_proxy !== undefined) b.premium_proxy = input.premium_proxy;
