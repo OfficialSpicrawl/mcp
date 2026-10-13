@@ -361,8 +361,8 @@ export const INITIALIZE_BODY = {
   },
 };
 
-/** A raw POST /mcp, bypassing the SDK client, for status/header assertions. */
-export async function rawPost(mcpURL, { key, sessionId, body = INITIALIZE_BODY } = {}) {
+/** A raw POST /mcp, bypassing the SDK client, for status/header assertions. `headers` are added last (no `key` for a non-Bearer form). */
+export async function rawPost(mcpURL, { key, sessionId, body = INITIALIZE_BODY, headers: extra = {} } = {}) {
   const headers = {
     "Content-Type": "application/json",
     Accept: "application/json, text/event-stream",
@@ -372,6 +372,7 @@ export async function rawPost(mcpURL, { key, sessionId, body = INITIALIZE_BODY }
     headers["Mcp-Session-Id"] = sessionId;
     headers["Mcp-Protocol-Version"] = "2025-06-18";
   }
+  Object.assign(headers, extra);
   const res = await fetch(mcpURL, { method: "POST", headers, body: JSON.stringify(body) });
   const text = await res.text();
   return { res, text };

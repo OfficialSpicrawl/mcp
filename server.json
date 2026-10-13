@@ -8,12 +8,12 @@
     "source": "github"
   },
   "websiteUrl": "https://docs.spicrawl.com/agents/mcp",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@spicrawl/mcp",
-      "version": "0.1.5",
+      "version": "0.1.6",
       "transport": { "type": "stdio" },
       "environmentVariables": [
         {

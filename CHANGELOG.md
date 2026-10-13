@@ -3,6 +3,14 @@
 All notable changes to `@spicrawl/mcp` are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.1.6 — 2026-10-13
+
+- `/mcp` now accepts the API key in the forms a gateway such as Smithery can send, because Smithery maps a connection parameter to a header but sends the raw value with no `Bearer ` prefix, and clients often cannot name the source `authorization`. In order: `Authorization: Bearer <key>` (unchanged), a raw `Authorization: <key>` when the whole value is a Spicrawl key, `x-api-key: <key>`, then `api-key: <key>`. The first form that holds a well-formed key wins.
+- A key is read from headers only, never from a query parameter, because URLs end up in access logs. A malformed value in any form is still `401`.
+- The `401` message mentions `x-api-key` as an alternative; its `WWW-Authenticate` challenge is unchanged. The session pinning, the key check at `initialize` and the server card are unchanged.
+- `/chatgpt/mcp` is unchanged: it takes OAuth access tokens only and ignores these headers.
+- README: Smithery configuration guidance (header `x-api-key`, or `Authorization` with the raw key).
+
 ## 0.1.5 — 2026-10-12
 
 - A static MCP server card at `GET /.well-known/mcp/server-card.json` on the HTTP server, so directories such as Smithery can list the server without a key (`/mcp` answers 401). It carries `serverInfo`, the streamable-http transport, bearer auth and the tool list, generated from the real tool definitions. The tool definitions name no execution engine, so the card is not filtered: it is the `tools/list` of `/mcp` with `SPICRAWL_MCP_HIDE_UNAVAILABLE` on, including the session `engine` tiers (`fetch`, `js`, `browser`). A test fails if the card or any published file ever names one. Public and cacheable for an hour. `/mcp` is unchanged.

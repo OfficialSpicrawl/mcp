@@ -103,6 +103,15 @@ describe("authentication on /chatgpt/mcp", () => {
     assert.equal(idp.requests.length, before);
   });
 
+  test("an API key in x-api-key or a raw Authorization is no credential here either", async () => {
+    const before = idp.requests.length;
+    for (const headers of [{ "x-api-key": VALID_KEY }, { "api-key": VALID_KEY }, { Authorization: VALID_KEY }]) {
+      const { res } = await chatgptPost(mcp.chatgptURL, { headers });
+      assert.equal(res.status, 401, JSON.stringify(Object.keys(headers)));
+    }
+    assert.equal(idp.requests.length, before);
+  });
+
   test("a token issued for another resource: 401", async () => {
     const t = oat("otheraud");
     idp.tokens.set(t, claims({ aud: "https://mcp.spicrawl.com/mcp" }));

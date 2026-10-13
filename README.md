@@ -312,13 +312,30 @@ More: [docs.spicrawl.com/agents/codex](https://docs.spicrawl.com/agents/codex).
 </details>
 
 <details>
+<summary><b>Smithery and other gateways</b></summary>
+
+A gateway that passes a connection parameter through as a header cannot always send `Authorization: Bearer <key>`: Smithery maps a parameter to a header but sends the raw value, with no `Bearer ` prefix, and a client often cannot name its source `authorization`. `/mcp` takes the key in any of these headers:
+
+| Header | Value |
+|---|---|
+| `x-api-key` | `spicrawl_live_...` (recommended for a gateway) |
+| `api-key` | `spicrawl_live_...` |
+| `Authorization` | `spicrawl_live_...` (the raw key, no `Bearer `), or `Bearer spicrawl_live_...` |
+
+In Smithery, make the API key a connection parameter, map it to the `x-api-key` header, and mark it secret. Or map it to `Authorization` and send the raw key; the server accepts that when the whole value is a Spicrawl key.
+
+If more than one is sent, the first that holds a well-formed key wins, in the order `Authorization: Bearer`, raw `Authorization`, `x-api-key`, `api-key`. A key in the query string is **not** read, because URLs end up in access logs. `/chatgpt/mcp` takes OAuth access tokens only and accepts none of these.
+
+</details>
+
+<details>
 <summary><b>Any other MCP client</b></summary>
 
 | Setting | Value |
 |---|---|
 | Transport | Streamable HTTP |
 | URL | `https://mcp.spicrawl.com/mcp` |
-| Header | `Authorization: Bearer <your key>` |
+| Header | `Authorization: Bearer <your key>` (or `x-api-key: <your key>`) |
 
 A stdio-only client runs `npx -y @spicrawl/mcp` with `SPICRAWL_API_KEY` in its environment. The server accepts API keys only, not OAuth. Setup pages for more clients (OpenCode, Zed, JetBrains, Cline, Goose and others): [docs.spicrawl.com/agents/mcp](https://docs.spicrawl.com/agents/mcp).
 
@@ -359,7 +376,7 @@ npx -y @spicrawl/mcp --http
 - `SPICRAWL_BASE_URL` **defaults to `http://127.0.0.1:8080`** in HTTP mode (a Spicrawl API on the same host), not to the public API. Set it to `https://api.spicrawl.com` to front the public API.
 - MCP is served at `POST`/`GET`/`DELETE /mcp`; liveness at `GET /healthz` (no auth).
 - `GET /.well-known/mcp/server-card.json` (no auth, `Cache-Control: public, max-age=3600`) is a static server card for directories such as Smithery that cannot scan `/mcp` without a key: `serverInfo`, the transport, bearer auth and the tool list. The tools are read from the same definitions as `tools/list` (as with `SPICRAWL_MCP_HIDE_UNAVAILABLE`), so it matches what an authenticated client sees.
-- Each caller sends their own key as `Authorization: Bearer spicrawl_live_...`. The key is checked against the API before a session opens (`401` if refused, `503` with `Retry-After` if the API cannot be reached), and a session is pinned to the key that opened it.
+- Each caller sends their own key as `Authorization: Bearer spicrawl_live_...`, or, for a gateway that cannot send the `Bearer ` prefix, as a raw `Authorization: spicrawl_live_...`, `x-api-key` or `api-key` header (see "Smithery and other gateways" above; never a query parameter). The key is checked against the API before a session opens (`401` if refused, `503` with `Retry-After` if the API cannot be reached), and a session is pinned to the key that opened it.
 - The server speaks plain HTTP. Put it behind TLS before sending keys across a network.
 
 ### ChatGPT endpoint (OAuth)
@@ -427,7 +444,7 @@ Use the MCP server when an AI agent should call Spicrawl as tools. Use [`@spicra
 
 | Symptom | Fix |
 |---|---|
-| HTTP `401` or "Unauthorized: send your Spicrawl API key" | The header is missing, or the key is unknown, revoked or expired. Check that the variable is set in the environment the client started from. |
+| HTTP `401` or "Unauthorized: send your Spicrawl API key" | The header is missing, or the key is malformed, unknown, revoked or expired. Check that the variable is set in the environment the client started from. A gateway that cannot send `Bearer ` can use an `x-api-key` header; a key in the URL is never read. |
 | The header contains a literal `${SPICRAWL_API_KEY}` | The client did not expand it. Use `${VAR}` in Claude Code, `${env:VAR}` in Cursor, `${input:id}` in VS Code, `bearer_token_env_var` in Codex. |
 | HTTP `503` with `Retry-After` on connect | The server could not reach the API to check your key. Retry; your key is fine. |
 | `ERR::AUTH::INSUFFICIENT_SCOPE` from a `spicrawl_usage*` tool | Grant the key the `read` scope in the dashboard. |
