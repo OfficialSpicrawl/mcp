@@ -5,6 +5,7 @@ The Spicrawl MCP server is a Model Context Protocol server that gives AI agents 
 [![npm version](https://img.shields.io/npm/v/@spicrawl/mcp.svg)](https://www.npmjs.com/package/@spicrawl/mcp)
 [![npm downloads](https://img.shields.io/npm/dm/@spicrawl/mcp.svg)](https://www.npmjs.com/package/@spicrawl/mcp)
 [![license](https://img.shields.io/npm/l/@spicrawl/mcp.svg)](https://github.com/OfficialSpicrawl/mcp/blob/main/LICENSE)
+[![smithery badge](https://smithery.ai/badge/spicrawl/web-scraper)](https://smithery.ai/servers/spicrawl/web-scraper)
 [![CI](https://github.com/OfficialSpicrawl/mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/OfficialSpicrawl/mcp/actions/workflows/ci.yml)
 
 **[Docs](https://docs.spicrawl.com/agents/mcp)** · **[Get an API key](https://app.spicrawl.com/signup)** · **[TypeScript SDK](https://github.com/OfficialSpicrawl/sdk)** · **[CLI](https://github.com/OfficialSpicrawl/cli)** · **[Agent plugins](https://github.com/OfficialSpicrawl/agent-plugins)** · **[Changelog](https://github.com/OfficialSpicrawl/mcp/blob/main/CHANGELOG.md)**
