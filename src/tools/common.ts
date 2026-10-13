@@ -1,4 +1,4 @@
-import type { z } from "zod";
+import { z } from "zod";
 import { ILayerClient, ILayerError } from "../client.js";
 import type { SpicrawlMcpServer } from "../server.js";
 
@@ -37,6 +37,26 @@ export function availableOnly<T extends z.ZodRawShape>(shape: T, hide: boolean):
   ) as T;
 }
 
+/**
+ * A tool result that carries an object for the tool's `outputSchema`: `data` is the
+ * structuredContent, and `text` (default: `data` as pretty JSON) is the text block
+ * older clients read, so the two always describe the same result.
+ */
+export function structured(data: Record<string, unknown>, text?: string) {
+  return {
+    content: [{ type: "text" as const, text: text ?? JSON.stringify(data, null, 2) }],
+    structuredContent: data,
+  };
+}
+
+/**
+ * An output schema's object: the fields we know, and any others the API adds. Output
+ * schemas describe what an agent can rely on, not a closed list, so a new API field
+ * never fails a call (a bare raw shape would advertise `additionalProperties: false`).
+ * Declare each field `.optional()`/`.nullish()` unless the API always sends it.
+ */
+export const loose = <T extends z.ZodRawShape>(shape: T) => z.object(shape).passthrough();
+
 export type ImageBlock = { type: "image"; data: string; mimeType: string };
 
 /** A file handed to the model host whole, such as a printed PDF (an MCP embedded resource). */
@@ -65,8 +85,11 @@ export async function run(
     }
     // MCP requires structuredContent to be a JSON object; an array, string or
     // null there makes the client reject the whole result (-32602). Some
-    // endpoints (a batch item's stored payload) return exactly those, so only
-    // objects get it. No tool declares an outputSchema, so omitting it is legal.
+    // endpoints (a batch item's stored payload, a docs page) return exactly
+    // those, so they travel as `{ content: <payload> }` in structuredContent
+    // (the shape a non-JSON body already has) while the text stays the payload
+    // itself. Every tool declares an outputSchema, and the SDK refuses a
+    // successful result that lacks structuredContent.
     if (isPlainObject(data)) {
       return {
         content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }, ...blocks],
@@ -76,7 +99,10 @@ export async function run(
     // A string is usually markdown or HTML: stringifying it would hand the agent
     // one quoted line of escaped newlines instead of the document.
     const text = typeof data === "string" ? data : (JSON.stringify(data, null, 2) ?? "");
-    return { content: [{ type: "text" as const, text }, ...blocks] };
+    return {
+      content: [{ type: "text" as const, text }, ...blocks],
+      structuredContent: { content: data ?? null } as Record<string, unknown>,
+    };
   } catch (err) {
     const message =
       err instanceof ILayerError

@@ -1,11 +1,81 @@
 import { z } from "zod";
-import { run, type RegisterTools } from "./common.js";
+import { loose, run, type RegisterTools } from "./common.js";
 
 // Request history: /v1/requests. Per-call records from the request log (Redis),
 // retained only for the org's retention window. The key's own project needs any
 // valid key; all_projects=true (every project in the org) and another project's
 // request by id need the `read` scope.
 // Not billing-grade: totals here need not match an invoice (use spicrawl_usage).
+
+// One record of the request log (openapi.yaml: RequestLogEntry). Fields the API
+// leaves out when zero or unknown are optional; spans are null when not measured.
+const MS = z.number().nullish();
+const ENTRY = {
+  id: z.string().describe("The request id (X-Request-Id)."),
+  created_at: z.string().optional().describe("When the request arrived, RFC 3339 UTC."),
+  project_id: z.string().optional(),
+  engine: z.string().optional().describe("The rendering tier that served it: fetch, js or browser. Absent when refused before a tier was chosen."),
+  status: z.string().optional().describe("Terminal outcome: success, failed, timeout, blocked, rejected or cancelled. Only success is charged."),
+  http_status: z.number().optional().describe("The target's HTTP status; absent when no response was received."),
+  error_code: z.string().optional().describe("The problem code the caller got, e.g. ERR::UPSTREAM::CHALLENGE. Absent on success."),
+  error_detail: z.string().optional(),
+  attempts: z.number().optional().describe("Dispatch attempts including retries."),
+  url: z.string().optional().describe("The target URL as requested."),
+  url_host: z.string().optional(),
+  proxy: loose({
+    source: z.string().optional().describe("pool, custom or direct."),
+    endpoint_id: z.string().optional(),
+    provider: z.string().optional(),
+    requested_tier: z.string().optional(),
+    requested_country: z.string().optional(),
+    country: z.string().optional().describe("Where the exit actually served from; compare with requested_country."),
+    sticky: z.boolean().optional(),
+    reason: z.string().optional(),
+    endpoints: z.array(z.string()).nullish().describe("Every exit touched, in attempt order."),
+  })
+    .optional()
+    .describe("What proxy was asked for versus what served. Never an exit IP or credentials."),
+  spans: loose({
+    admission_ms: MS,
+    dispatch_ms: MS,
+    worker_ms: MS,
+    queue_ms: MS.describe("Wait for a slot; high means capacity shortage, not a slow page."),
+    engine_ms: MS,
+    upstream_ms: MS,
+    extract_ms: MS,
+    total_ms: MS,
+  })
+    .optional()
+    .describe("Latency in milliseconds per stage; null means not measured. Stages do not sum to total_ms."),
+  blocked: loose({
+    vendor: z.string().optional(),
+    signal: z.string().optional(),
+    rule: z.string().optional(),
+  })
+    .optional()
+    .describe("Present only when a bot challenge was detected."),
+  bytes_in: z.number().optional(),
+  bytes_out: z.number().optional(),
+  proxy_bytes: z.number().optional(),
+  credits_micro: z.number().optional().describe("Credits charged in micro-credits (1 credit = 1000000); 0 unless success."),
+  features: z.record(z.string(), z.unknown()).optional().describe("Features the request used; free-form."),
+};
+
+// `data` and `page` are optional so a gateway or older server that words the
+// list differently never fails the call; a real answer always carries both.
+const LIST_OUTPUT = loose({
+  data: z.array(loose(ENTRY)).optional().describe("Request records, newest first. Can be shorter than limit while page.has_more is true."),
+  page: loose({
+    retention_hours: z.number().optional().describe("How long records are kept; an empty data means nothing in this window."),
+    retained_since: z.string().optional().describe("The oldest instant still readable."),
+    has_more: z.boolean().optional().describe("True when more records may exist; continue with next_before and next_before_id."),
+    next_before: z.string().optional().describe("Send back as before. Present only when has_more."),
+    next_before_id: z.string().optional().describe("Send back as before_id. Present only when has_more."),
+  })
+    .optional()
+    .describe("Paging cursor and the retention window."),
+});
+
 export const registerRequestsTools: RegisterTools = (server, client) => {
   server.registerTool(
     "spicrawl_requests_list",
@@ -41,6 +111,7 @@ export const registerRequestsTools: RegisterTools = (server, client) => {
           .optional()
           .describe("Cursor: request id, exactly as returned in page.next_before_id."),
       },
+      outputSchema: LIST_OUTPUT,
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async (args) =>
@@ -70,6 +141,7 @@ export const registerRequestsTools: RegisterTools = (server, client) => {
       inputSchema: {
         id: z.string().min(1).describe("The request id (a ULID, from X-Request-Id or a spicrawl_requests_list row's `id`)."),
       },
+      outputSchema: loose(ENTRY),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ id }) => run(() => client.request("GET", `/v1/requests/${encodeURIComponent(id)}`)),

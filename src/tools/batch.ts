@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { ILayerClient } from "../client.js";
-import { COMING_SOON, availableOnly, run, type RegisterTools } from "./common.js";
+import { COMING_SOON, availableOnly, loose, run, type RegisterTools } from "./common.js";
 
 export const jobPath = (id: string) => `/v1/batch/${encodeURIComponent(id)}`;
 
@@ -47,6 +47,126 @@ export async function batchResults(
 }
 
 const jobId = z.string().min(1).describe("The batch job id returned by spicrawl_batch_submit or spicrawl_batch_list.");
+
+// -----------------------------------------------------------------------------
+// Output schemas. Permissive on purpose (`loose` keeps unknown keys, fields the API
+// may omit are optional/nullish): they document what an agent can rely on, and a new
+// API field must never fail a call. Shapes follow docs/openapi.yaml (BatchJob etc.).
+// -----------------------------------------------------------------------------
+
+const count = (d: string) => z.number().optional().describe(d);
+
+const batchProgress = loose({
+  total: count("Items in the job (grows when items are appended to an open job)."),
+  completed: count("Items in any terminal status (succeeded + failed + cancelled + skipped)."),
+  succeeded: count("Items that succeeded. Only these are charged."),
+  failed: count("Items that failed after all attempts; re-run them with spicrawl_batch_retry."),
+  cancelled: count("Items not run because the job was cancelled."),
+  skipped: count("Items skipped (for example after failure_threshold or credit_budget stopped the run)."),
+  remaining: count("Items not yet finished (total - completed)."),
+  percent_complete: count("completed / total x 100."),
+  credits_charged: count("Credits actually charged so far (whole credits, rounded down)."),
+  credits_charged_micro: count("Same as credits_charged in micro-credits (1 credit = 1,000,000)."),
+  bytes: count("Total response bytes of finished items."),
+}).describe("Live item counters and the credits charged so far.");
+
+/** The job object, identical across submit, list, status, cancel, close (and inside retry / add_items). */
+const batchJob = loose({
+  id: z.string().describe("Job id. Pass it as `job_id` to the other spicrawl_batch_* tools."),
+  project_id: z.string().optional().describe("Project the API key belongs to."),
+  name: z.string().nullish().describe("The label given at submission, if any."),
+  status: z
+    .string()
+    .optional()
+    .describe(
+      "Lifecycle: queued, running, paused, cancelling, completed, failed or cancelled. Keep polling while queued/running/paused/cancelling; stop at completed, failed or cancelled.",
+    ),
+  open: z.boolean().nullish().describe("True while the job accepts appended items (it will not complete until closed)."),
+  status_url: z.string().optional().describe("API path to poll for this job: /v1/batch/{id}."),
+  results_url: z.string().optional().describe("API path of the job's results: /v1/batch/{id}/results."),
+  params: z.record(z.unknown()).nullish().describe("The job-level scrape settings as stored."),
+  total_items: count("Number of items in the job."),
+  concurrency: count("Effective per-job concurrency after the server's clamping."),
+  priority: count("Effective scheduling priority."),
+  max_attempts: count("Effective attempts per item."),
+  failure_threshold: z.number().nullish().describe("Failed-item count that aborts the job, when set."),
+  estimated_credits: count("Credits reserved at submission (a hold, not a charge; compare with progress.credits_charged)."),
+  estimated_credits_micro: count("Same as estimated_credits in micro-credits."),
+  progress: batchProgress.optional(),
+  submitted_at: z.string().optional().describe("ISO-8601 time the job was accepted."),
+  started_at: z.string().nullish().describe("ISO-8601 time the first item started."),
+  finished_at: z.string().nullish().describe("ISO-8601 time the job reached a terminal status."),
+  cancel_requested_at: z.string().nullish().describe("ISO-8601 time a cancel was accepted."),
+  results_expire_at: z.string().nullish().describe("ISO-8601 deadline after which results answer 410 Gone."),
+  error_code: z.string().nullish().describe("Machine code of a job-level failure."),
+  error_message: z.string().nullish().describe("Human-readable job-level failure reason."),
+  warnings: z
+    .array(z.string())
+    .nullish()
+    .describe("Decisions made on the caller's behalf at submission (a clamped concurrency, items not yet queued)."),
+});
+
+const batchResultLine = loose({
+  seq: z.number().describe("0-based position in submission order; use it with spicrawl_batch_task_content."),
+  url: z.string().optional().describe("The target URL as submitted."),
+  external_id: z.string().nullish().describe("The external_id supplied for this item, if any."),
+  status: z.string().optional().describe("Terminal item status: succeeded, failed, cancelled or skipped."),
+  attempts: count("How many times the item was tried."),
+  http_status: z.number().nullish().describe("The target site's HTTP status (absent when no response was received)."),
+  request_id: z.string().nullish().describe("Id of the underlying request, for request history."),
+  credits_micro: count("Micro-credits charged for this item (0 unless succeeded)."),
+  bytes: count("Response size recorded for this item."),
+  duration_ms: count("Time spent on the item's final attempt, in milliseconds."),
+  result: loose({
+    content: z.string().nullish().describe("The item's document as raw JSON text (JSON-decode once to get the markdown, text or html). A prefix when truncated."),
+    bytes: count("Full size of the stored payload in bytes."),
+    truncated: z.boolean().nullish().describe("True when `content` is only a prefix."),
+    omitted: z.boolean().nullish().describe("True when no content was included because the page's size budget was spent; use a smaller `limit`."),
+    unavailable: z.string().nullish().describe("Why the payload could not be read at all."),
+  })
+    .nullish()
+    .describe("The payload inline. Absent while the job is running or when the item has none."),
+  result_url: z.string().nullish().describe("API path to fetch this item's content on its own."),
+  error: loose({
+    code: z.string().optional().describe("Stable machine error code; switch on this, not on text."),
+    retryable: z.boolean().optional().describe("True when running the item again may succeed."),
+  })
+    .nullish()
+    .describe("Why the item failed. Absent on success."),
+  finished_at: z.string().nullish().describe("ISO-8601 time the item reached its terminal status."),
+});
+
+const batchListOutput = loose({
+  batches: z.array(batchJob).describe("Jobs, newest first (empty when there are none)."),
+  next_cursor: z.string().nullish().describe("Pass back as `cursor` for the next page; absent on the last page."),
+});
+
+const batchResultsOutput = loose({
+  results: z.array(batchResultLine).describe("Finished items of the job, in seq order."),
+  next_cursor: z.string().nullish().describe("Pass back as `cursor` for the next page; absent on the last page."),
+});
+
+const batchTaskContentOutput = loose({
+  content: z
+    .unknown()
+    .optional()
+    .describe(
+      "The item's document when it is text (markdown, text or html) or any non-object JSON value. " +
+        "An item whose payload is a JSON object is returned as that object's own fields instead.",
+    ),
+});
+
+const batchRetryOutput = loose({
+  job: batchJob.optional().describe("The job as it stands after the call."),
+  items_reset: z.number().optional().describe("Failed items reset to queued (0 means nothing had failed)."),
+  items_dispatched: z.number().optional().describe("Of those, how many reached the dispatch queue now; the rest are recovered automatically."),
+});
+
+const batchAddItemsOutput = loose({
+  job: batchJob.optional().describe("The job as it stands after the call."),
+  items_added: z.number().optional().describe("Items written to the job."),
+  items_dispatched: z.number().optional().describe("Of those, how many reached the dispatch queue now; do not re-add the rest."),
+});
 
 // Shared scrape settings: a subset of the /v1/scrape request object, applied to
 // every item of the job (an item in `items` may override any of them).
@@ -177,6 +297,7 @@ export const registerBatchTools: RegisterTools = (server, client, { hideUnavaila
           .optional()
           .describe("Id of a registered webhook endpoint notified (with the job object) when the job completes."),
       },
+      outputSchema: batchJob,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },
     async (input) => {
@@ -216,6 +337,7 @@ export const registerBatchTools: RegisterTools = (server, client, { hideUnavaila
         limit: z.number().int().min(1).max(200).optional().describe("Page size (default 50, max 200)."),
         cursor: z.string().optional().describe("`next_cursor` from a previous page, verbatim."),
       },
+      outputSchema: batchListOutput,
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ status, limit, cursor }) =>
@@ -233,6 +355,7 @@ export const registerBatchTools: RegisterTools = (server, client, { hideUnavaila
         "Return one batch job with its status and progress (total/completed/succeeded/failed/remaining, credits charged). " +
         "Poll this after `spicrawl_batch_submit`; once status is `completed`, `failed` or `cancelled`, read `spicrawl_batch_results`.",
       inputSchema: { job_id: jobId },
+      outputSchema: batchJob,
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ job_id }) => run(() => client.request("GET", jobPath(job_id))),
@@ -259,6 +382,7 @@ export const registerBatchTools: RegisterTools = (server, client, { hideUnavaila
         limit: z.number().int().min(1).max(5000).optional().describe("Page size (default 500, max 5000)."),
         cursor: z.string().optional().describe("`next_cursor` from a previous page, verbatim."),
       },
+      outputSchema: batchResultsOutput,
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ job_id, status, limit, cursor }) => run(() => batchResults(client, job_id, { status, limit, cursor })),
@@ -280,6 +404,7 @@ export const registerBatchTools: RegisterTools = (server, client, { hideUnavaila
         job_id: jobId,
         seq: z.number().int().min(0).describe("The item's sequence number (0-based, submission order)."),
       },
+      outputSchema: batchTaskContentOutput,
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ job_id, seq }) =>
@@ -298,6 +423,7 @@ export const registerBatchTools: RegisterTools = (server, client, { hideUnavaila
         "their results; items already running finish first, so the job comes back `cancelling` and moves to " +
         "`cancelled` when they drain. Cannot be undone — resubmit to run the URLs again. Returns the job object.",
       inputSchema: { job_id: jobId },
+      outputSchema: batchJob,
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
     async ({ job_id }) => run(() => client.request("POST", `${jobPath(job_id)}/cancel`)),
@@ -314,6 +440,7 @@ export const registerBatchTools: RegisterTools = (server, client, { hideUnavaila
         "Re-queue every FAILED item of a batch job so it runs again (succeeded items are untouched; a job with no " +
         "failures is returned unchanged). Returns `{ job, items_reset, items_dispatched }`.",
       inputSchema: { job_id: jobId },
+      outputSchema: batchRetryOutput,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },
     async ({ job_id }) => run(() => client.request("POST", `${jobPath(job_id)}/retry`)),
@@ -332,6 +459,7 @@ export const registerBatchTools: RegisterTools = (server, client, { hideUnavaila
         "if the job is closed or finished. Not idempotent: calling twice adds the URLs twice. " +
         "Returns `{ job, items_added, items_dispatched }`.",
       inputSchema: { job_id: jobId, ...itemsInput, ...shared },
+      outputSchema: batchAddItemsOutput,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },
     async (input) => {
@@ -356,6 +484,7 @@ export const registerBatchTools: RegisterTools = (server, client, { hideUnavaila
         "Stop an open batch job accepting items, so it completes once its queued work drains. " +
         "Idempotent (closing a closed job succeeds). Returns the job object.",
       inputSchema: { job_id: jobId },
+      outputSchema: batchJob,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ job_id }) => run(() => client.request("POST", `${jobPath(job_id)}/close`)),

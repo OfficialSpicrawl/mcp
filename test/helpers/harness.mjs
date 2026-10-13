@@ -361,6 +361,16 @@ export const INITIALIZE_BODY = {
   },
 };
 
+export const TOOLS_LIST_BODY = { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} };
+
+/** A tools/call that would hit the API (spicrawl_usage_summary): without a key it must never get that far. */
+export const TOOLS_CALL_BODY = {
+  jsonrpc: "2.0",
+  id: 3,
+  method: "tools/call",
+  params: { name: "spicrawl_usage_summary", arguments: {} },
+};
+
 /** A raw POST /mcp, bypassing the SDK client, for status/header assertions. `headers` are added last (no `key` for a non-Bearer form). */
 export async function rawPost(mcpURL, { key, sessionId, body = INITIALIZE_BODY, headers: extra = {} } = {}) {
   const headers = {

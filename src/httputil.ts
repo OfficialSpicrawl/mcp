@@ -10,13 +10,13 @@ export function rpcError(res: ServerResponse, status: number, code: number, mess
   res.end(JSON.stringify({ jsonrpc: "2.0", error: { code, message }, id: null }));
 }
 
-/** Reads and parses a JSON body of at most MAX_BODY bytes; an empty body is undefined. */
-export async function readJSON(req: IncomingMessage): Promise<unknown> {
+/** Reads and parses a JSON body of at most `max` bytes (default MAX_BODY); an empty body is undefined. */
+export async function readJSON(req: IncomingMessage, max = MAX_BODY): Promise<unknown> {
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const c of req) {
     size += (c as Buffer).length;
-    if (size > MAX_BODY) throw new Error("body too large");
+    if (size > max) throw new Error("body too large");
     chunks.push(c as Buffer);
   }
   const raw = Buffer.concat(chunks).toString("utf8");
@@ -44,4 +44,14 @@ export function apiKeyFromRequest(req: IncomingMessage): string | null {
   const h = req.headers;
   const candidates = [bearerToken(req), h.authorization?.trim(), h["x-api-key"], h["api-key"]];
   return candidates.find((c): c is string => typeof c === "string" && KEY_RE.test(c)) ?? null;
+}
+
+/**
+ * Whether the request presented anything as a credential: a non-blank
+ * `Authorization`, `x-api-key` or `api-key` header, well-formed or not. A caller
+ * who sent a (mistyped) key must hear that it is wrong, not be treated as keyless.
+ */
+export function presentsCredentials(req: IncomingMessage): boolean {
+  const h = req.headers;
+  return [h.authorization, h["x-api-key"], h["api-key"]].some((v) => (Array.isArray(v) ? v.join("") : (v ?? "")).trim() !== "");
 }

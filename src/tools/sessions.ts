@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { COMING_SOON, availableOnly, run, type RegisterTools } from "./common.js";
+import { COMING_SOON, availableOnly, loose, run, type RegisterTools } from "./common.js";
 
 const sessionPath = (id: string) => `/v1/sessions/${encodeURIComponent(id)}`;
 
@@ -18,6 +18,94 @@ const force = z
 
 // The rendering tiers a session can be bound to (the API's public names).
 const engines = ["fetch", "js", "browser"] as const;
+
+// Output shapes (structuredContent). Loose and mostly optional: the API may add fields, and a
+// session in another state omits some (a released one has `context: null`, no `lease`).
+const ts = (what: string) => z.string().optional().describe(`${what}, RFC 3339 UTC.`);
+
+const domainScores = z
+  .record(
+    loose({
+      score: z.number().optional().describe("Error score; rises on failures, decays on successes. Blocked at 3."),
+      good: z.number().int().optional().describe("Successful requests counted."),
+      bad: z.number().int().optional().describe("Failed requests counted."),
+      last_updated: z.number().optional().describe("Last update, Unix milliseconds."),
+      retired: z.boolean().optional().describe("Hard block for this domain; use a new session for it."),
+    }),
+  )
+  .optional()
+  .describe("Per-domain standing, keyed by domain. Omitted when empty.");
+
+const sessionOut = loose({
+  id: z.string().describe("Session id; pass it as `session_id` to spicrawl_scrape."),
+  project_id: z.string().optional().describe("Project the session belongs to."),
+  // Plain strings, not enums: a client rejects a result that fails its outputSchema, so a value the API adds later must not break the call.
+  engine: z.string().optional().describe("Rendering tier the session is bound to: fetch, js or browser."),
+  status: z.string().optional().describe("active, released or expired; derived from the clock, and only `active` sessions can be used."),
+  sticky_key: z.string().optional().describe("Exit pin in use (empty when rotate_ip was set)."),
+  proxy: loose({
+    tier: z.string().optional().describe("Exit tier: datacenter or residential."),
+    country: z.string().optional().describe("Lowercase alpha-2 exit country, when one was requested."),
+    region_pool: z.string().optional().describe("Regional pool requested at creation."),
+  })
+    .optional()
+    .describe("The session's exit intent (never an IP or endpoint)."),
+  created_at: ts("Creation time"),
+  last_used_at: z.string().nullish().describe("Last successful scrape, RFC 3339 UTC; null if never used."),
+  expires_at: ts("Current expiry (slides on use)"),
+  hard_expires_at: ts("Fixed ceiling the expiry never passes"),
+  released_at: ts("Release time, on released sessions"),
+  usage_count: z.number().int().optional().describe("Successful scrapes that used the session."),
+  context: loose({
+    schema_version: z.number().int().optional(),
+    cookies: z.number().int().optional().describe("Cookies stored."),
+    origins: z.number().int().optional().describe("Distinct origins with stored web storage."),
+    bytes: z.number().int().optional().describe("Serialised size of the stored context."),
+  })
+    .nullish()
+    .describe("Size summary of the stored context (counts only, no secrets); null once the session is not active."),
+  retired: z.string().optional().describe("Why the session was taken out of service (expired, usage_exhausted, explicit); absent while usable."),
+  domain_scores: domainScores,
+  fingerprint: z.record(z.unknown()).optional().describe("Browser fingerprint, as stored."),
+  lease: loose({
+    holder: z.string().optional(),
+    expires_at: ts("When the lease lapses at the latest"),
+  })
+    .optional()
+    .describe("Present only while a scrape holds the session; release and delete are refused until it lapses unless `force`."),
+  warnings: z.array(z.string()).optional().describe("Decisions made on your behalf at creation, e.g. a TTL reduced to the organization maximum."),
+});
+
+const sessionListOut = loose({
+  sessions: z.array(sessionOut).describe("Sessions on this page, newest first; may be short or empty under a `status` filter."),
+  next_cursor: z.string().optional().describe("Pass back as `cursor` for the next page; absent on the last page."),
+});
+
+const sessionContextOut = loose({
+  session_id: z.string().describe("The session id."),
+  schema_version: z.number().int().optional(),
+  session_context: loose({
+    cookies: z.array(loose({ name: z.string().optional(), value: z.string().optional(), domain: z.string().optional() })).optional(),
+    local_storage: z.record(z.unknown()).optional().describe("Origin to key/value map."),
+    session_storage: z.record(z.unknown()).optional().describe("Origin to key/value map."),
+    indexed_db: z.record(z.unknown()).optional().describe("Origin to databases; opaque."),
+  })
+    .optional()
+    .describe("Cookies and storage: secrets. Pass it as `session_context` to spicrawl_session_create to clone the session."),
+  fingerprint: z.record(z.unknown()).nullish().describe("Stored browser fingerprint; null when none."),
+  domain_scores: domainScores,
+  retired: z.string().optional().describe("Why the session was retired; absent while usable."),
+  usage_count: z.number().int().optional(),
+  created_at: ts("Creation time"),
+  last_used_at: z.string().nullish().describe("Last use, RFC 3339 UTC; null if never used."),
+  expires_at: ts("Current expiry"),
+  warning: z.string().optional().describe("The API's reminder that this state dies with the session."),
+});
+
+const sessionDeletedOut = loose({
+  deleted: z.boolean().describe("Always true on success (deleting an already-deleted session succeeds)."),
+  session_id: z.string().describe("The id that was deleted."),
+});
 
 // Sessions: /v1/sessions.
 export const registerSessionsTools: RegisterTools = (server, client, { hideUnavailable }) => {
@@ -84,6 +172,7 @@ export const registerSessionsTools: RegisterTools = (server, client, { hideUnava
           ),
       }, hideUnavailable),
       // Creates a persistent record in the user's own account; nothing outside it is contacted.
+      outputSchema: sessionOut,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
     async (input) => {
@@ -109,6 +198,7 @@ export const registerSessionsTools: RegisterTools = (server, client, { hideUnava
         limit: z.number().int().min(1).max(200).optional().describe("Page size (default 50, max 200)."),
         cursor: z.string().optional().describe("`next_cursor` from a previous page, verbatim."),
       },
+      outputSchema: sessionListOut,
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ status, engine, limit, cursor }) =>
@@ -126,6 +216,7 @@ export const registerSessionsTools: RegisterTools = (server, client, { hideUnava
         "Return one session's metadata: status, `engine` (its rendering tier), proxy/exit, usage count, expiry, lease holder, and a summary " +
         "of its stored context. Never returns the credentials themselves (use spicrawl_session_context for that).",
       inputSchema: { session_id: sessionId },
+      outputSchema: sessionOut,
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ session_id }) => run(() => client.request("GET", sessionPath(session_id))),
@@ -143,6 +234,7 @@ export const registerSessionsTools: RegisterTools = (server, client, { hideUnava
         "fingerprint and domain scores. The `session_context` object can be passed to spicrawl_session_create to clone " +
         "the session. The result contains secrets (login cookies): do not echo it to the user or logs unless asked.",
       inputSchema: { session_id: sessionId },
+      outputSchema: sessionContextOut,
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ session_id }) => run(() => client.request("GET", `${sessionPath(session_id)}/context`)),
@@ -161,6 +253,7 @@ export const registerSessionsTools: RegisterTools = (server, client, { hideUnava
         "The record stays visible (status `released`) so its history can still be inspected. " +
         "Refused while a scrape holds the session's lease unless `force` is true. Returns the session object.",
       inputSchema: { session_id: sessionId, force },
+      outputSchema: sessionOut,
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
     async ({ session_id, force }) =>
@@ -179,6 +272,7 @@ export const registerSessionsTools: RegisterTools = (server, client, { hideUnava
         "if you only want to stop using it). Idempotent: deleting an already-deleted session succeeds. Refused while a " +
         "scrape holds the session's lease unless `force` is true.",
       inputSchema: { session_id: sessionId, force },
+      outputSchema: sessionDeletedOut,
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
     async ({ session_id, force }) =>

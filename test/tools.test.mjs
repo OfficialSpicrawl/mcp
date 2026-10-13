@@ -52,20 +52,20 @@ describe("result shaping", () => {
     assert.deepEqual(JSON.parse(res.content[0].text), { content: MARKDOWN_PAYLOAD });
   });
 
-  test("spicrawl_batch_task_content returns a JSON string payload verbatim, without structuredContent", async () => {
+  test("spicrawl_batch_task_content returns a JSON string payload verbatim as text, and as {content} in structuredContent", async () => {
     const res = await call("spicrawl_batch_task_content", { job_id: "job_123", seq: 2 });
     assert.equal(res.rpcError, undefined, `unexpected JSON-RPC error: ${res.rpcError?.message}`);
     assert.equal(res.isError ?? false, false, `tool error: ${res.content?.[0]?.text}`);
     assert.equal(res.content[0].text, MARKDOWN_PAYLOAD, "a string payload should arrive unescaped");
-    assert.equal(res.structuredContent, undefined);
+    assert.deepEqual(res.structuredContent, { content: MARKDOWN_PAYLOAD });
   });
 
-  test("spicrawl_batch_task_content returns a JSON array payload as text, without structuredContent", async () => {
+  test("spicrawl_batch_task_content returns a JSON array payload as text, and as {content} in structuredContent", async () => {
     const res = await call("spicrawl_batch_task_content", { job_id: "job_123", seq: 1 });
     assert.equal(res.rpcError, undefined, `unexpected JSON-RPC error: ${res.rpcError?.message}`);
     assert.equal(res.isError ?? false, false, `tool error: ${res.content?.[0]?.text}`);
     assert.deepEqual(JSON.parse(res.content[0].text), ARRAY_PAYLOAD);
-    assert.equal(res.structuredContent, undefined);
+    assert.deepEqual(res.structuredContent, { content: ARRAY_PAYLOAD });
   });
 
   test("an object-returning tool gives pretty JSON text and structuredContent equal to the object", async () => {

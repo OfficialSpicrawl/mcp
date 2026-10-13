@@ -3,6 +3,14 @@
 All notable changes to `@spicrawl/mcp` are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.1.7 — 2026-10-13
+
+- Every tool now declares an MCP `outputSchema` and returns matching `structuredContent` next to the same text it always returned, so a client can read fields such as `credits`, `status` and `next_cursor` without parsing text. The schemas follow the API's OpenAPI and are deliberately open: every field but an id is optional, fields the API adds later pass through (`additionalProperties` is true), and values such as a job or session `status` and an `engine` are plain strings with the known values in the description, because a client rejects a result that fails its schema. A test fails if a schema ever uses an enum, a format or a closed object. An error is still a tool error with no `structuredContent`.
+- **Changed:** a tool whose payload is not a JSON object now also returns `structuredContent`, as `{ "content": <payload> }` (the shape a non-JSON body already had), because MCP requires an object there and a client enforcing an `outputSchema` refuses a result without one. This covers `spicrawl_docs_read`, `spicrawl_docs_index` and `spicrawl_batch_task_content` when an item's stored payload is a bare string or a JSON array. The text content is unchanged: still the document itself, or the array as JSON.
+- `spicrawl_docs_read` and `spicrawl_docs_index` also report `url`, `truncated` and (for a page) `title`, `md_url` and `section` in `structuredContent`.
+- `/mcp` answers discovery without an API key, so a directory such as Smithery can list the tools while the key is an optional connection parameter: `initialize`, `ping`, the `initialized` notification and `tools/list` (the same list as the server card). No session is opened and nothing is sent to the API. Every other request, a `tools/call` included, is still `401` and names `x-api-key`; so is a request that sends a malformed key (only a blank key header counts as no key) or names a session id. A session-less `GET` is `405`. Keyed requests, the key check at `initialize` and session pinning are unchanged.
+- Tool names are unchanged. Smithery's naming check prefers dot notation, but Claude's API and OpenAI's function calling accept only letters, digits, `_` and `-` in a tool name, so renaming would make the tools unusable in those clients.
+
 ## 0.1.6 — 2026-10-13
 
 - `/mcp` now accepts the API key in the forms a gateway such as Smithery can send, because Smithery maps a connection parameter to a header but sends the raw value with no `Bearer ` prefix, and clients often cannot name the source `authorization`. In order: `Authorization: Bearer <key>` (unchanged), a raw `Authorization: <key>` when the whole value is a Spicrawl key, `x-api-key: <key>`, then `api-key: <key>`. The first form that holds a well-formed key wins.

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { run, type RegisterTools } from "./common.js";
+import { loose, run, structured, type RegisterTools } from "./common.js";
 
 // Documentation: the public Fumadocs site at <docs base> (client.docsBaseURL:
 // https://docs.spicrawl.com, or http://host:8080/docs on a self-hosted
@@ -226,6 +226,47 @@ function trimmed(text: string, max: number, what: string): string {
   return `${text.slice(0, max)}\n\n[Truncated: showing the first ${max} of ${text.length} characters of ${what}.]`;
 }
 
+/** One match inside a page: the section it is in, a short snippet, and a link to that section. */
+const MATCH = loose({
+  heading: z.string().optional().describe("The section the match is in."),
+  snippet: z.string().optional().describe("A short plain-text excerpt around the match."),
+  url: z.string().describe("Link to the section, with its #anchor."),
+});
+
+const SEARCH_OUTPUT = {
+  query: z.string().describe("The search text, as sent."),
+  error_code: loose({
+    code: z.string(),
+    url: z.string().describe("The code's entry on the errors page."),
+    md_url: z.string().describe("The errors page as Markdown; read it with spicrawl_docs_read."),
+    note: z.string().optional(),
+  })
+    .optional()
+    .describe("Present when the query is an error code (ERR::AREA::NAME)."),
+  results: z
+    .array(
+      loose({
+        title: z.string(),
+        breadcrumbs: z.array(z.string()).optional(),
+        url: z.string().describe("The page on the docs site."),
+        md_url: z.string().describe("The page as Markdown; pass it to spicrawl_docs_read."),
+        matches: z.array(MATCH),
+      }),
+    )
+    .describe("Matching pages, most relevant first. Empty when nothing matched."),
+  hint: z.string().optional().describe("What to try when there are no results."),
+};
+
+/** A Markdown document, whole or cut at the size cap. */
+const DOCUMENT_OUTPUT = {
+  url: z.string().describe("Where the document lives on the docs site."),
+  md_url: z.string().optional().describe("The Markdown source it was read from."),
+  title: z.string().optional().describe("The page's first heading, when it has one."),
+  section: z.string().optional().describe("The #anchor that was asked for, without the #. The whole page is returned."),
+  truncated: z.boolean().describe("True when the content was cut at the size cap; the content says so at its end."),
+  content: z.string().describe("The document as Markdown."),
+};
+
 export const registerDocsTools: RegisterTools = (server, client) => {
   const docsBase = client.docsBaseURL;
 
@@ -242,6 +283,7 @@ export const registerDocsTools: RegisterTools = (server, client) => {
         query: z.string().trim().min(1).max(200).describe("What to look for: a feature, parameter, error code or question, e.g. 'wait_for selector' or 'ERR::AUTH::INSUFFICIENT_SCOPE'."),
         limit: z.number().int().min(1).max(20).optional().describe("Maximum pages to return, 1-20. Default 8."),
       },
+      outputSchema: loose(SEARCH_OUTPUT),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
     async ({ query, limit }) =>
@@ -288,10 +330,11 @@ export const registerDocsTools: RegisterTools = (server, client) => {
           .max(500)
           .describe("Page path (`guides/anti-bot`, `errors#AUTH_INVALID_KEY`) or a full docs URL, as returned by spicrawl_docs_search."),
       },
+      outputSchema: loose(DOCUMENT_OUTPUT),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
-    async ({ path }) =>
-      run(async () => {
+    async ({ path }) => {
+      try {
         const { slug, hash } = resolveDocsPath(path, docsBase);
         const url = mdURL(docsBase, slug);
         const text = await docsText(
@@ -303,8 +346,23 @@ export const registerDocsTools: RegisterTools = (server, client) => {
           throw new Error(`${url} returned an HTML page, not Markdown; check the path with spicrawl_docs_search or spicrawl_docs_index.`);
         }
         const header = `Source: ${pageURL(docsBase, slug, hash)}${hash ? ` (look for the section ${hash})` : ""}\n\n`;
-        return header + trimmed(text, MAX_PAGE_CHARS, "this page");
-      }),
+        const content = trimmed(text, MAX_PAGE_CHARS, "this page");
+        const title = /^#\s+(.+)$/m.exec(text)?.[1].trim();
+        return structured(
+          {
+            url: pageURL(docsBase, slug),
+            md_url: url,
+            ...(title ? { title } : {}),
+            ...(hash ? { section: hash.slice(1) } : {}),
+            truncated: content !== text,
+            content,
+          },
+          header + content,
+        );
+      } catch (err) {
+        return run(() => Promise.reject(err)); // the one place errors become tool errors
+      }
+    },
   );
 
   server.registerTool(
@@ -315,13 +373,22 @@ export const registerDocsTools: RegisterTools = (server, client) => {
         "The docs' llms.txt: every Spicrawl documentation page with its title, a one-line description and its Markdown URL. Use it to find the right " +
         "page when a search does not, or to get an overview of what is documented; read a page with spicrawl_docs_read. No parameters.",
       inputSchema: {},
+      outputSchema: loose({
+        url: DOCUMENT_OUTPUT.url,
+        truncated: DOCUMENT_OUTPUT.truncated,
+        content: z.string().describe("The index (llms.txt): one line per page with its title, description and Markdown URL."),
+      }),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
-    async () =>
-      run(async () => {
+    async () => {
+      try {
         const url = `${docsBase}/llms.txt`;
         const text = await docsText(url, "text/plain, text/markdown;q=0.9", "The docs index (llms.txt) was not found");
-        return trimmed(text, MAX_INDEX_CHARS, "the index");
-      }),
+        const content = trimmed(text, MAX_INDEX_CHARS, "the index");
+        return structured({ url, truncated: content !== text, content }, content);
+      } catch (err) {
+        return run(() => Promise.reject(err));
+      }
+    },
   );
 };

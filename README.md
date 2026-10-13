@@ -61,7 +61,7 @@ Both transports serve the same 25 `spicrawl_*` tools, and every call runs under 
 
 ## Tools
 
-25 tools, grouped by task. Tools reject unknown arguments, so a misspelt field fails with an error naming it instead of being silently dropped. Every tool sets a `title` and explicit `readOnlyHint`, `destructiveHint` and `openWorldHint` annotations, so a client knows which calls to confirm: `spicrawl_scrape` is not read-only (its `method` and `actions` can submit forms), and `spicrawl_batch_cancel`, `spicrawl_session_release` and `spicrawl_session_delete` are destructive. Full argument reference: [docs.spicrawl.com/agents/mcp](https://docs.spicrawl.com/agents/mcp#tools).
+25 tools, grouped by task. Tools reject unknown arguments, so a misspelt field fails with an error naming it instead of being silently dropped. Every tool sets a `title` and explicit `readOnlyHint`, `destructiveHint` and `openWorldHint` annotations, so a client knows which calls to confirm: `spicrawl_scrape` is not read-only (its `method` and `actions` can submit forms), and `spicrawl_batch_cancel`, `spicrawl_session_release` and `spicrawl_session_delete` are destructive. Every tool also declares an `outputSchema` and returns matching `structuredContent` beside the same text it always returned, so a client can read fields (`credits`, `status`, `next_cursor`, ...) without parsing text. The schemas list what an agent can rely on and stay open: fields the API adds later pass through, and statuses and tiers are plain strings. A tool that returns a document or a JSON array (`spicrawl_docs_read`, `spicrawl_batch_task_content`) puts it under `content` in `structuredContent`. Full argument reference: [docs.spicrawl.com/agents/mcp](https://docs.spicrawl.com/agents/mcp#tools).
 
 ### Scrape a website to Markdown
 
@@ -324,6 +324,8 @@ A gateway that passes a connection parameter through as a header cannot always s
 
 In Smithery, make the API key a connection parameter, map it to the `x-api-key` header, and mark it secret. Or map it to `Authorization` and send the raw key; the server accepts that when the whole value is a Spicrawl key.
 
+The key can be left optional in the connection schema (no `required`): `initialize`, `ping` and `tools/list` on `/mcp` answer without a key, with the same tool list as the server card, so a directory can list the tools. Every tool call still needs a valid key and is refused with `401` otherwise; no session is opened and nothing is billed or read without one. Say in the parameter's description that it is needed to run any tool.
+
 If more than one is sent, the first that holds a well-formed key wins, in the order `Authorization: Bearer`, raw `Authorization`, `x-api-key`, `api-key`. A key in the query string is **not** read, because URLs end up in access logs. `/chatgpt/mcp` takes OAuth access tokens only and accepts none of these.
 
 </details>
@@ -376,6 +378,7 @@ npx -y @spicrawl/mcp --http
 - `SPICRAWL_BASE_URL` **defaults to `http://127.0.0.1:8080`** in HTTP mode (a Spicrawl API on the same host), not to the public API. Set it to `https://api.spicrawl.com` to front the public API.
 - MCP is served at `POST`/`GET`/`DELETE /mcp`; liveness at `GET /healthz` (no auth).
 - `GET /.well-known/mcp/server-card.json` (no auth, `Cache-Control: public, max-age=3600`) is a static server card for directories such as Smithery that cannot scan `/mcp` without a key: `serverInfo`, the transport, bearer auth and the tool list. The tools are read from the same definitions as `tools/list` (as with `SPICRAWL_MCP_HIDE_UNAVAILABLE`), so it matches what an authenticated client sees.
+- Without any key, `/mcp` answers only discovery: `initialize`, `ping`, the `initialized` notification and `tools/list` (the same list as the server card; no `Mcp-Session-Id` is issued and nothing is sent upstream). Any other request, a `tools/call` included, is `401`, as is a request that sends a malformed key or names a session. A session-less `GET` is `405`.
 - Each caller sends their own key as `Authorization: Bearer spicrawl_live_...`, or, for a gateway that cannot send the `Bearer ` prefix, as a raw `Authorization: spicrawl_live_...`, `x-api-key` or `api-key` header (see "Smithery and other gateways" above; never a query parameter). The key is checked against the API before a session opens (`401` if refused, `503` with `Retry-After` if the API cannot be reached), and a session is pinned to the key that opened it.
 - The server speaks plain HTTP. Put it behind TLS before sending keys across a network.
 
