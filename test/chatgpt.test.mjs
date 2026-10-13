@@ -21,6 +21,7 @@ import {
   forbiddenIn,
   oat,
   rawPost,
+  TOOLS_CALL_BODY,
   startFakeApi,
   startFakeIntrospection,
   startMcp,
@@ -267,7 +268,7 @@ describe("metadata, challenge and kill switch", () => {
 
   test("/mcp keeps its own 401 and takes keys, whatever the switch", async () => {
     for (const server of [mcp, rootPrm, off]) {
-      const { res } = await rawPost(server.mcpURL, {});
+      const { res } = await rawPost(server.mcpURL, { body: TOOLS_CALL_BODY });
       assert.equal(res.status, 401);
       assert.equal(res.headers.get("www-authenticate"), 'Bearer realm="spicrawl-mcp"');
       const ok = await rawPost(server.mcpURL, { key: VALID_KEY });

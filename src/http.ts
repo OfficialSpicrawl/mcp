@@ -17,6 +17,10 @@
  * else's key. An initialize is refused (401) unless the API accepts the key,
  * and answered 503 when the API cannot be asked.
  *
+ * Without any key, /mcp still answers discovery (see answerDiscovery): `initialize`,
+ * `ping` and `tools/list`, from the same tool list as the server card, opening no
+ * session and calling nothing upstream. Everything else, tool calls included, is 401.
+ *
  *   SPICRAWL_MCP_ADDR   listen address, default 127.0.0.1:8090
  *   SPICRAWL_BASE_URL   upstream Spicrawl API, default http://127.0.0.1:8080
  *   SPICRAWL_PUBLIC_BASE_URL  the API as remote callers reach it, used for URLs
@@ -39,10 +43,10 @@ import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
+import { isInitializeRequest, LATEST_PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS } from "@modelcontextprotocol/sdk/types.js";
 import { ILayerClient, USER_AGENT } from "./client.js";
-import { buildServer, isTruthy } from "./server.js";
-import { apiKeyFromRequest, readJSON, rpcError } from "./httputil.js";
+import { buildServer, isTruthy, SERVER_NAME, SERVER_VERSION } from "./server.js";
+import { apiKeyFromRequest, presentsCredentials, readJSON, rpcError } from "./httputil.js";
 import { chatgptConfigFromEnv, type ChatgptConfig } from "./chatgpt/oauth.js";
 import { chatgptRoutes } from "./chatgpt/http.js";
 import { buildServerCard } from "./card.js";
@@ -115,9 +119,84 @@ async function closeSession(id: string, why: string) {
   await s.server.close().catch(() => {});
 }
 
+// The only methods answered without a key. All are read-only and answered from the
+// static card: no tool handler is reachable, so no credit can be spent and no account
+// data seen. A request with ANY other method (or one in a batch) is refused outright.
+const DISCOVERY_METHODS = new Set(["initialize", "notifications/initialized", "ping", "tools/list"]);
+const DISCOVERY_MAX_BODY = 64 * 1024; // no key, so a small body cap: these requests are tiny
+
+type Rpc = { id?: unknown; method?: unknown; params?: unknown };
+const isRpc = (m: unknown): m is Rpc => typeof m === "object" && m !== null && !Array.isArray(m);
+
+/**
+ * Answers a keyless discovery request and returns true, or returns false (nothing
+ * written) for anything else, which the caller then refuses with 401. Keyless
+ * discovery exists so a directory (Smithery) can list the tools from a live
+ * `initialize` + `tools/list` while the API key stays optional in its connection form.
+ *
+ * It opens no session (no Mcp-Session-Id is issued, so there is nothing to pin or to
+ * hijack), and a request that names a session id is never answered here: sessions
+ * stay reachable only with the key that opened them.
+ */
+async function answerDiscovery(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
+  if (req.method !== "POST" || req.headers["mcp-session-id"]) return false;
+  let body: unknown;
+  try {
+    body = await readJSON(req, DISCOVERY_MAX_BODY);
+  } catch {
+    return false;
+  }
+  const batch = Array.isArray(body);
+  const messages: unknown[] = Array.isArray(body) ? body : [body];
+  if (messages.length === 0 || !messages.every((m) => isRpc(m) && typeof m.method === "string" && DISCOVERY_METHODS.has(m.method))) {
+    return false;
+  }
+  let tools: unknown[];
+  try {
+    serverCard ??= buildServerCard();
+    tools = (await serverCard).tools;
+  } catch (err) {
+    serverCard = undefined;
+    log("discovery failed:", err instanceof Error ? err.message : String(err));
+    rpcError(res, 500, -32603, "Internal error");
+    return true;
+  }
+  const replies: unknown[] = [];
+  for (const m of messages as Rpc[]) {
+    if (m.id === undefined || m.id === null) continue; // a notification: nothing to answer
+    let result: unknown = {};
+    if (m.method === "initialize") {
+      const asked = (m.params as { protocolVersion?: unknown } | undefined)?.protocolVersion;
+      result = {
+        protocolVersion: SUPPORTED_PROTOCOL_VERSIONS.includes(asked as string) ? asked : LATEST_PROTOCOL_VERSION,
+        capabilities: { tools: {} },
+        serverInfo: { name: SERVER_NAME, version: SERVER_VERSION },
+        instructions:
+          "No API key was sent, so the tools are listed but none can be called. Send your Spicrawl API key as " +
+          "'Authorization: Bearer spicrawl_live_...' or in an 'x-api-key' header to use them.",
+      };
+    } else if (m.method === "tools/list") {
+      result = { tools };
+    }
+    replies.push({ jsonrpc: "2.0", id: m.id, result });
+  }
+  if (replies.length === 0) {
+    res.writeHead(202).end();
+  } else {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(batch ? replies : replies[0]));
+  }
+  return true;
+}
+
 async function handleMcp(req: IncomingMessage, res: ServerResponse) {
   const key = apiKeyFromRequest(req);
   if (!key) {
+    if (!presentsCredentials(req) && !req.headers["mcp-session-id"]) {
+      // Discovery keeps no session, so there is no standalone stream to open (the spec allows 405).
+      if (req.method === "GET") return rpcError(res, 405, -32000, "Method not allowed: POST discovery requests to /mcp, or send an API key to open a session", { Allow: "POST" });
+      if (await answerDiscovery(req, res)) return;
+    }
     return rpcError(res, 401, -32001,
       "Unauthorized: send your Spicrawl API key as 'Authorization: Bearer spicrawl_live_...' (or in an 'x-api-key' header)",
       { "WWW-Authenticate": 'Bearer realm="spicrawl-mcp"' });
@@ -198,12 +277,12 @@ const chatgpt = chatgptRoutes(chatgptConfig, { baseURL: BASE_URL, publicBaseURL:
 
 // Built on first request and kept: it only changes with a new release. A failed
 // build is not kept, so the next request tries again.
-let serverCard: Promise<string> | undefined;
+let serverCard: ReturnType<typeof buildServerCard> | undefined;
 
 async function handleCard(req: IncomingMessage, res: ServerResponse) {
   try {
-    serverCard ??= buildServerCard().then((c) => JSON.stringify(c));
-    const body = await serverCard;
+    serverCard ??= buildServerCard();
+    const body = JSON.stringify(await serverCard);
     res.writeHead(200, {
       "Content-Type": "application/json; charset=utf-8",
       "Cache-Control": "public, max-age=3600",

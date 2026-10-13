@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { run, type RegisterTools } from "./common.js";
+import { loose, run, type RegisterTools } from "./common.js";
 
 // Browser (CDP): GET /v1/browser is a WebSocket; MCP cannot carry it, so this
 // module mints a single-use token URL for the caller's own CDP client.
@@ -53,6 +53,13 @@ export const registerBrowserTools: RegisterTools = (server, client, { hideUnavai
           .optional()
           .describe("Your own proxy, as http://user:pass@host:port. Replaces our pool, so proxy_country, proxy_region and sticky_key cannot be combined with it. Kept out of the returned URL."),
       },
+      // The success shape; today minting always fails (an error result carries no structuredContent).
+      outputSchema: loose({
+        url: z.string().describe("ws:// or wss:// connect URL carrying a single-use token (never the API key); use it as the CDP browser WebSocket endpoint."),
+        expires_at: z.string().optional().describe("When the token expires, RFC 3339 UTC (60 s after minting)."),
+        single_use: z.boolean().describe("Always true: the URL works for one connection."),
+        notes: z.array(z.string()).optional().describe("Usage notes for the connect URL."),
+      }),
       // Mints a token (state) and opens a browser that can go anywhere on the web.
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },

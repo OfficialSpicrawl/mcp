@@ -1,7 +1,8 @@
 /**
  * The static MCP server card, served unauthenticated at
  * GET /.well-known/mcp/server-card.json (src/http.ts). Directories such as
- * Smithery cannot scan /mcp (it answers 401 without a key) and read this instead.
+ * Smithery read this when it cannot scan /mcp (tool calls answer 401 without a key;
+ * only the keyless discovery methods are answered, see answerDiscovery in src/http.ts).
  *
  * The tool list is not written by hand: it is what a real session's tools/list
  * answers, taken from the same buildServer() the endpoint uses, so the card

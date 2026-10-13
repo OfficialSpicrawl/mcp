@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { COMING_SOON, availableOnly, run, type RegisterTools } from "./common.js";
+import { COMING_SOON, availableOnly, loose, run, type RegisterTools } from "./common.js";
 import { attachScreenshots } from "./screenshots.js";
 import { attachPdf } from "./pdf.js";
 import { ActionsSchema, toApiActions } from "./actions.js";
@@ -147,6 +147,46 @@ const ScrapeInput = {
     .describe("Target statuses to treat as success instead of an error (e.g. [404] to capture a not-found page)."),
 };
 
+// What spicrawl_scrape returns (ScrapeEnvelope in the API's OpenAPI). Every field is
+// optional and the object is open: a markdown/text/html scrape is just `{ content }`, a
+// PDF carries `pdf` instead of `content`, and a result the schema rejected would be
+// reported as a tool error AFTER the credits were charged, so nothing here is strict.
+const ScrapeOutput = loose({
+  content: z.string().optional().describe("The page in the requested format (markdown, text or html); absent for a PDF."),
+  url: z.string().optional().describe("The requested URL."),
+  final_url: z.string().optional().describe("URL after redirects; may be empty."),
+  status: z.number().optional().describe("The target site's HTTP status (not this call's). Anything but 200/404/410 is charged 0."),
+  credits: z.number().optional().describe("Credits charged for this call."),
+  engine: z.string().optional().describe("Rendering tier that produced the page: fetch, js or browser."),
+  proxy_source: z.string().optional().describe("Whose exit carried the request: pool, custom or direct."),
+  truncated: z.boolean().optional().describe("The target body exceeded the size cap and was cut."),
+  headers: z.record(z.string()).nullish().describe("The target's response headers."),
+  warnings: z.array(z.string()).nullish().describe("Advisories about the call, e.g. an ignored option."),
+  data: z.record(z.unknown()).nullish().describe("Output of `extract` or `autoparse`."),
+  empty_fields: z.array(z.string()).nullish().describe("`extract` rules that matched nothing: usually a broken selector."),
+  links: z.array(z.string()).nullish().describe("The page's links, absolute and de-duplicated, when `links` was set."),
+  screenshots: z
+    .array(loose({
+      label: z.string().optional(),
+      format: z.string().optional(),
+      size_bytes: z.number().optional(),
+      width: z.number().optional(),
+      height: z.number().optional(),
+      attached_as: z.string().optional().describe("Which image content block holds this screenshot."),
+      not_attached: z.string().optional().describe("Why the image is not attached, and how to get it."),
+    }))
+    .nullish()
+    .describe("Metadata of each screenshot; the images are separate image content blocks."),
+  network: z.array(z.record(z.unknown())).nullish().describe("Responses the page fetched, when `network_capture` was set."),
+  pdf: loose({
+    content_type: z.string().optional(),
+    size_bytes: z.number().optional(),
+    attached_as: z.string().optional().describe("Which resource content block holds the PDF."),
+    not_attached: z.string().optional().describe("Why the PDF is not attached, and how to get it."),
+  }).optional().describe("Present for format=pdf: the file itself is a resource content block."),
+  diagnostics: z.record(z.unknown()).nullish().describe("Which rendering tiers were tried, after an escalation."),
+});
+
 /**
  * API parameter names this tool exposes under a different argument name. An
  * API message saying "set `js_render=true`" is advice the agent cannot follow
@@ -185,6 +225,7 @@ server.registerTool(
       "Screenshots come back as image content blocks; each `screenshots` entry in the JSON keeps its metadata and says which block holds it. " +
       "A PDF comes back as a resource content block, with its size, the rendering tier and the credits in the JSON.",
     inputSchema: availableOnly(ScrapeInput, hideUnavailable),
+    outputSchema: ScrapeOutput,
     // Not read-only, whatever the default call does: `method` accepts POST/PUT/PATCH/DELETE
     // and `actions` can click, fill and run scripts on the target page, so a call can submit
     // a form or write to a third-party site (a write-style outbound action). Not marked

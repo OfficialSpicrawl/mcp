@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
 import {
   OTHER_VALID_KEY,
+  TOOLS_CALL_BODY,
   UNKNOWN_KEY,
   VALID_KEY,
   rawPost,
@@ -90,8 +91,8 @@ describe("endpoint behaviour", () => {
     assert.equal(typeof body.sessions, "number");
   });
 
-  test("no Authorization header gets 401", async () => {
-    const { res, text } = await rawPost(mcp.mcpURL, {});
+  test("no Authorization header gets 401 for anything but discovery (see optional-config.test.mjs)", async () => {
+    const { res, text } = await rawPost(mcp.mcpURL, { body: TOOLS_CALL_BODY });
     assert.equal(res.status, 401, text);
     assert.ok(res.headers.get("www-authenticate"));
   });
@@ -194,7 +195,6 @@ describe("API key forms", () => {
       { "x-api-key": "spicrawl_prod_" + "a".repeat(52) },
       { "x-api-key": `Bearer ${VALID_KEY}` },
       { "api-key": "not-a-key" },
-      { "x-api-key": "" },
     ];
     for (const headers of bad) {
       const { res, text, upstream } = await attempt(headers);
@@ -207,7 +207,7 @@ describe("API key forms", () => {
 
   test("a key in the query string is not read", async () => {
     for (const q of ["api_key", "apiKey", "x-api-key", "api-key", "authorization", "key"]) {
-      const { res, upstream } = await attempt({}, { url: `${mcp.mcpURL}?${q}=${VALID_KEY}` });
+      const { res, upstream } = await attempt({}, { url: `${mcp.mcpURL}?${q}=${VALID_KEY}`, body: TOOLS_CALL_BODY });
       assert.equal(res.status, 401, q);
       assert.deepEqual(upstream, [], q);
     }
