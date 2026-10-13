@@ -29,9 +29,16 @@ async function get(url, fetcher) {
   return fetcher(url, { signal: AbortSignal.timeout(30_000) });
 }
 
-export async function checkPublication(server, fetcher = fetch) {
+export async function checkPublication(server, fetcher = fetch, { attempts = 12, delayMs = 10_000 } = {}) {
   const item = server.packages[0];
-  const npm = await get(`https://registry.npmjs.org/${encodeURIComponent(item.identifier)}/${encodeURIComponent(item.version)}`, fetcher);
+  const npmUrl = `https://registry.npmjs.org/${encodeURIComponent(item.identifier)}/${encodeURIComponent(item.version)}`;
+  // A version npm just accepted can 404 here for a minute or two while its
+  // registry catches up, so wait for it rather than fail the release.
+  let npm = await get(npmUrl, fetcher);
+  for (let i = 1; npm.status === 404 && i < attempts; i++) {
+    await new Promise((r) => setTimeout(r, delayMs));
+    npm = await get(npmUrl, fetcher);
+  }
   if (!npm.ok) throw new Error(`npm lookup failed: HTTP ${npm.status}. Publish the package before the registry entry.`);
   const published = await npm.json();
   assert.equal(published.name, item.identifier, 'Published npm package name mismatch');
