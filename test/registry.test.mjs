@@ -24,12 +24,16 @@ test('publish only after npm ownership is verified and registry returns 404', as
   assert.equal(await checkPublication(server, replies(response(npm), response({}, 404))), true);
 });
 
+test('a version npm has not caught up on yet is waited for', async () => {
+  assert.equal(await checkPublication(server, replies(response({}, 404), response({}, 404), response(npm), response({}, 404)), { delayMs: 0 }), true);
+});
+
 test('rerunning a published version skips registry publishing', async () => {
   assert.equal(await checkPublication(server, replies(response(npm), response({ server }))), false);
 });
 
 test('unpublished npm package or ownership mismatch prevents registry publication', async () => {
-  await assert.rejects(checkPublication(server, replies(response({}, 404))), /npm lookup failed/);
+  await assert.rejects(checkPublication(server, replies(response({}, 404), response({}, 404)), { attempts: 2, delayMs: 0 }), /npm lookup failed/);
   await assert.rejects(checkPublication(server, replies(response({ ...npm, mcpName: 'wrong' }))), /mcpName/);
 });
 
