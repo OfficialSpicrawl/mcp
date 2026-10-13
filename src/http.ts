@@ -3,12 +3,14 @@
  * spicrawl-mcp-http — the Spicrawl MCP server over Streamable HTTP, so a user can
  * connect an MCP client to a hosted URL instead of installing anything.
  *
- *   POST/GET/DELETE /mcp   MCP Streamable HTTP endpoint (Bearer auth)
+ *   POST/GET/DELETE /mcp   MCP Streamable HTTP endpoint (API key auth)
  *   GET /healthz           liveness, no auth
  *   GET /.well-known/mcp/server-card.json  static server card for directories (src/card.ts), no auth
  *   /chatgpt/mcp and its OAuth metadata: see src/chatgpt/http.ts (off by default)
  *
- * Auth is the caller's own Spicrawl API key (`Authorization: Bearer spicrawl_live_...`);
+ * Auth is the caller's own Spicrawl API key, in `Authorization: Bearer spicrawl_live_...`
+ * or, for gateways that cannot send a Bearer prefix, a raw `Authorization: spicrawl_live_...`,
+ * `x-api-key` or `api-key` (see apiKeyFromRequest; never a query parameter);
  * every tool call runs upstream under that key. One MCP server per session, and
  * a session is pinned to the key that created it: a request presenting another
  * key with that session id is refused (403), so no caller can run under someone
@@ -40,7 +42,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { ILayerClient, USER_AGENT } from "./client.js";
 import { buildServer, isTruthy } from "./server.js";
-import { KEY_RE, bearerToken, readJSON, rpcError } from "./httputil.js";
+import { apiKeyFromRequest, readJSON, rpcError } from "./httputil.js";
 import { chatgptConfigFromEnv, type ChatgptConfig } from "./chatgpt/oauth.js";
 import { chatgptRoutes } from "./chatgpt/http.js";
 import { buildServerCard } from "./card.js";
@@ -62,11 +64,6 @@ const sessions = new Map<string, Session>();
 
 const log = (...a: unknown[]) => console.error(new Date().toISOString(), ...a);
 const hashKey = (k: string) => createHash("sha256").update(k).digest();
-
-function bearer(req: IncomingMessage): string | null {
-  const t = bearerToken(req);
-  return t && KEY_RE.test(t) ? t : null;
-}
 
 type KeyCheck = { ok: true } | { ok: false; status: 401 | 503; message: string };
 
@@ -119,10 +116,10 @@ async function closeSession(id: string, why: string) {
 }
 
 async function handleMcp(req: IncomingMessage, res: ServerResponse) {
-  const key = bearer(req);
+  const key = apiKeyFromRequest(req);
   if (!key) {
     return rpcError(res, 401, -32001,
-      "Unauthorized: send your Spicrawl API key as 'Authorization: Bearer spicrawl_live_...'",
+      "Unauthorized: send your Spicrawl API key as 'Authorization: Bearer spicrawl_live_...' (or in an 'x-api-key' header)",
       { "WWW-Authenticate": 'Bearer realm="spicrawl-mcp"' });
   }
   const keyHash = hashKey(key);

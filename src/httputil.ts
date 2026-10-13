@@ -33,3 +33,15 @@ export function bearerToken(req: IncomingMessage): string | null {
 
 /** Spicrawl API keys (`spicrawl_live_…`, `spicrawl_test_…`). */
 export const KEY_RE = /^spicrawl_(live|test)_[A-Za-z0-9_-]{8,}$/;
+
+/**
+ * The API key a caller of /mcp sent, or null. Tried in order, the first that has a
+ * key's shape wins: `Authorization: Bearer <key>`, `Authorization: <key>` (the raw
+ * value a gateway such as Smithery sends, with no scheme), `x-api-key`, `api-key`.
+ * Headers only: a key in a query string would land in access logs.
+ */
+export function apiKeyFromRequest(req: IncomingMessage): string | null {
+  const h = req.headers;
+  const candidates = [bearerToken(req), h.authorization?.trim(), h["x-api-key"], h["api-key"]];
+  return candidates.find((c): c is string => typeof c === "string" && KEY_RE.test(c)) ?? null;
+}
