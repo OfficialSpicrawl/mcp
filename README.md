@@ -1,6 +1,6 @@
 # Spicrawl MCP Server
 
-The Spicrawl MCP server is a Model Context Protocol server that gives AI agents in Claude Code, Claude Desktop, Cursor, VS Code, Windsurf, Gemini CLI and Codex web scraping to Markdown, structured data extraction, screenshots, browser sessions and batch scraping as 25 native tools.
+The Spicrawl MCP server is a Model Context Protocol server that gives AI agents in Claude Code, Claude Desktop, Cursor, VS Code, Windsurf, Gemini CLI and Codex web scraping to Markdown, structured data extraction, screenshots, browser sessions and batch scraping as native tools.
 
 [![npm version](https://img.shields.io/npm/v/@spicrawl/mcp.svg)](https://www.npmjs.com/package/@spicrawl/mcp)
 [![npm downloads](https://img.shields.io/npm/dm/@spicrawl/mcp.svg)](https://www.npmjs.com/package/@spicrawl/mcp)
@@ -36,7 +36,7 @@ The Spicrawl MCP server is a Model Context Protocol server that gives AI agents 
 
 4. Ask your agent: *"Use Spicrawl to read https://example.com/pricing as markdown and list each plan with its price."* It calls `spicrawl_scrape` and gets the page back as Markdown.
 
-Both transports serve the same 25 `spicrawl_*` tools, and every call runs under your key with the same scopes, limits and credits as a direct API call.
+Both transports serve the same `spicrawl_*` tools (25 are defined; the hosted endpoint lists 24 until remote browsers launch, see [Tools](#tools)), and every call runs under your key with the same scopes, limits and credits as a direct API call.
 
 ## What it does
 
@@ -62,7 +62,7 @@ Both transports serve the same 25 `spicrawl_*` tools, and every call runs under 
 
 ## Tools
 
-25 tools, grouped by task. Tools reject unknown arguments, so a misspelt field fails with an error naming it instead of being silently dropped. Every tool sets a `title` and explicit `readOnlyHint`, `destructiveHint` and `openWorldHint` annotations, so a client knows which calls to confirm: `spicrawl_scrape` is not read-only (its `method` and `actions` can submit forms), and `spicrawl_batch_cancel`, `spicrawl_session_release` and `spicrawl_session_delete` are destructive. Every tool also declares an `outputSchema` and returns matching `structuredContent` beside the same text it always returned, so a client can read fields (`credits`, `status`, `next_cursor`, ...) without parsing text. The schemas list what an agent can rely on and stay open: fields the API adds later pass through, and statuses and tiers are plain strings. A tool that returns a document or a JSON array (`spicrawl_docs_read`, `spicrawl_batch_task_content`) puts it under `content` in `structuredContent`. Full argument reference: [docs.spicrawl.com/agents/mcp](https://docs.spicrawl.com/agents/mcp#tools).
+25 tools, grouped by task. The hosted endpoint lists 24 until remote browsers launch: its keyless `tools/list` and the server card leave out `spicrawl_browser_connect_url` ([Coming soon](#coming-soon)), while a session opened with your key and the stdio package (`npx -y @spicrawl/mcp`) list all 25. Tools reject unknown arguments, so a misspelt field fails with an error naming it instead of being silently dropped. Every tool sets a `title` and explicit `readOnlyHint`, `destructiveHint` and `openWorldHint` annotations, so a client knows which calls to confirm: `spicrawl_scrape` is not read-only (its `method` and `actions` can submit forms), and `spicrawl_batch_cancel`, `spicrawl_session_release` and `spicrawl_session_delete` are destructive. Every tool also declares an `outputSchema` and returns matching `structuredContent` beside the same text it always returned, so a client can read fields (`credits`, `status`, `next_cursor`, ...) without parsing text. The schemas list what an agent can rely on and stay open: fields the API adds later pass through, and statuses and tiers are plain strings. A tool that returns a document or a JSON array (`spicrawl_docs_read`, `spicrawl_batch_task_content`) puts it under `content` in `structuredContent`. Full argument reference: [docs.spicrawl.com/agents/mcp](https://docs.spicrawl.com/agents/mcp#tools).
 
 ### Scrape a website to Markdown
 
@@ -115,7 +115,7 @@ Both transports serve the same 25 `spicrawl_*` tools, and every call runs under 
 
 ### Coming soon
 
-`spicrawl_browser_connect_url` will mint a single-use CDP WebSocket URL for driving a Spicrawl-hosted browser from any CDP client; remote browsers are not available yet. The schemas also accept `ai_extract`, `stealth`, `extract_preset`, `premium_proxy`, `proxy_country` and `sticky_key` ahead of launch. Agents should not send them yet. To list only what works today, set `SPICRAWL_MCP_HIDE_UNAVAILABLE=1` (see [Environment variables](https://github.com/OfficialSpicrawl/mcp#environment-variables)).
+`spicrawl_browser_connect_url` will mint a single-use CDP WebSocket URL for driving a Spicrawl-hosted browser from any CDP client; remote browsers are not available yet. It is the 25th tool and the only one the hosted keyless listing and the server card leave out (24 tools there). The schemas also accept `ai_extract`, `stealth`, `extract_preset`, `premium_proxy`, `proxy_country` and `sticky_key` ahead of launch. Agents should not send them yet. To list only what works today, set `SPICRAWL_MCP_HIDE_UNAVAILABLE=1` (see [Environment variables](https://github.com/OfficialSpicrawl/mcp#environment-variables)).
 
 ## Example prompts
 
@@ -325,7 +325,7 @@ A gateway that passes a connection parameter through as a header cannot always s
 
 In Smithery, make the API key a connection parameter, map it to the `x-api-key` header, and mark it secret. Or map it to `Authorization` and send the raw key; the server accepts that when the whole value is a Spicrawl key.
 
-The key can be left optional in the connection schema (no `required`): `initialize`, `ping` and `tools/list` on `/mcp` answer without a key, with the same tool list as the server card, so a directory can list the tools. Every tool call still needs a valid key and is refused with `401` otherwise; no session is opened and nothing is billed or read without one. Say in the parameter's description that it is needed to run any tool.
+The key can be left optional in the connection schema (no `required`): `initialize`, `ping` and `tools/list` on `/mcp` answer without a key, with the same tool list as the server card (24 tools, without `spicrawl_browser_connect_url`), so a directory can list the tools. Every tool call still needs a valid key and is refused with `401` otherwise; no session is opened and nothing is billed or read without one. Say in the parameter's description that it is needed to run any tool.
 
 If more than one is sent, the first that holds a well-formed key wins, in the order `Authorization: Bearer`, raw `Authorization`, `x-api-key`, `api-key`. A key in the query string is **not** read, because URLs end up in access logs. `/chatgpt/mcp` takes OAuth access tokens only and accepts none of these.
 
@@ -355,7 +355,7 @@ A stdio-only client runs `npx -y @spicrawl/mcp` with `SPICRAWL_API_KEY` in its e
 | `SPICRAWL_DOCS_HOST` | none | both | Legacy: an origin whose docs are at `/docs`. Read only when `SPICRAWL_DOCS_URL` is unset. |
 | `SPICRAWL_MCP_ADDR` | `127.0.0.1:8090` | HTTP | Listen address, `host:port`. |
 | `SPICRAWL_MCP_SESSION_IDLE_MS` | `1800000` (30 min) | HTTP | Idle MCP sessions are dropped after this long. |
-| `SPICRAWL_MCP_HIDE_UNAVAILABLE` | off | both | `1`, `true`, `yes` or `on` leaves out what is announced but not available yet: `spicrawl_browser_connect_url` is not registered (24 tools) and every argument marked "Coming soon" is dropped from the schemas (`ai_extract`, `stealth`, `extract_preset`, `premium_proxy`, `proxy_country`, `sticky_key`, and the session `rotate_ip`, `region_pool` and `fingerprint`). Read when the server starts a session, so restart the process after changing it. |
+| `SPICRAWL_MCP_HIDE_UNAVAILABLE` | off | both | `1`, `true`, `yes` or `on` leaves out what is announced but not available yet: `spicrawl_browser_connect_url` is not registered (24 tools instead of 25) and every argument marked "Coming soon" is dropped from the schemas (`ai_extract`, `stealth`, `extract_preset`, `premium_proxy`, `proxy_country`, `sticky_key`, and the session `rotate_ip`, `region_pool` and `fingerprint`). Read when the server starts a session, so restart the process after changing it. The keyless `tools/list` and the server card behave as if it were always on. |
 | `SPICRAWL_CHATGPT_ENABLED` | off | HTTP | `1`, `true`, `yes` or `on` turns on the [ChatGPT endpoint](#chatgpt-endpoint-oauth). Off, `/chatgpt/mcp`, its metadata and the OpenAI challenge all answer `404`. |
 | `SPICRAWL_CHATGPT_RESOURCE` | `https://mcp.spicrawl.com/chatgpt/mcp` | HTTP | The OAuth resource identifier. Tokens must be issued for exactly this `aud`; the metadata is published at `/.well-known/oauth-protected-resource` + its path. |
 | `SPICRAWL_OAUTH_ISSUER` | `https://app.spicrawl.com` | HTTP | The authorization server, listed in the metadata. Tokens are introspected at `<issuer>/api/oauth/introspect`. |
@@ -378,8 +378,8 @@ npx -y @spicrawl/mcp --http
 
 - `SPICRAWL_BASE_URL` **defaults to `http://127.0.0.1:8080`** in HTTP mode (a Spicrawl API on the same host), not to the public API. Set it to `https://api.spicrawl.com` to front the public API.
 - MCP is served at `POST`/`GET`/`DELETE /mcp`; liveness at `GET /healthz` (no auth).
-- `GET /.well-known/mcp/server-card.json` (no auth, `Cache-Control: public, max-age=3600`) is a static server card for directories such as Smithery that cannot scan `/mcp` without a key: `serverInfo`, the transport, bearer auth and the tool list. The tools are read from the same definitions as `tools/list` (as with `SPICRAWL_MCP_HIDE_UNAVAILABLE`), so it matches what an authenticated client sees.
-- Without any key, `/mcp` answers only discovery: `initialize`, `ping`, the `initialized` notification and `tools/list` (the same list as the server card; no `Mcp-Session-Id` is issued and nothing is sent upstream). Any other request, a `tools/call` included, is `401`, as is a request that sends a malformed key or names a session. A session-less `GET` is `405`.
+- `GET /.well-known/mcp/server-card.json` (no auth, `Cache-Control: public, max-age=3600`) is a static server card for directories such as Smithery that cannot scan `/mcp` without a key: `serverInfo`, the transport, bearer auth and the tool list. The tools are read from the same definitions as `tools/list`, as if `SPICRAWL_MCP_HIDE_UNAVAILABLE` were on: 24 tools, without `spicrawl_browser_connect_url`. A session opened with a key lists that tool too, unless the variable is set.
+- Without any key, `/mcp` answers only discovery: `initialize`, `ping`, the `initialized` notification and `tools/list` (the same 24-tool list as the server card; no `Mcp-Session-Id` is issued and nothing is sent upstream). Any other request, a `tools/call` included, is `401`, as is a request that sends a malformed key or names a session. A session-less `GET` is `405`.
 - Each caller sends their own key as `Authorization: Bearer spicrawl_live_...`, or, for a gateway that cannot send the `Bearer ` prefix, as a raw `Authorization: spicrawl_live_...`, `x-api-key` or `api-key` header (see "Smithery and other gateways" above; never a query parameter). The key is checked against the API before a session opens (`401` if refused, `503` with `Retry-After` if the API cannot be reached), and a session is pinned to the key that opened it.
 - The server speaks plain HTTP. Put it behind TLS before sending keys across a network.
 
