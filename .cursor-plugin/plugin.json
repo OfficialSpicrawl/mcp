@@ -18,7 +18,6 @@
     "JSON",
     "JavaScript Rendering",
     "Web Scraper",
-    "Crawler",
     "Data Extraction",
     "Structured Data",
     "Batch Scraping",
@@ -30,6 +29,6 @@
     "LLM"
   ],
   "category": "integrations",
-  "tags": ["mcp", "mcp-server", "web-scraping", "web-scraper", "markdown", "crawler", "data-extraction", "javascript-rendering", "ai-agents", "rag"],
+  "tags": ["mcp", "mcp-server", "web-scraping", "web-scraper", "markdown", "batch-scraping", "data-extraction", "javascript-rendering", "ai-agents", "rag"],
   "mcpServers": "./mcp.json"
 }

@@ -51,7 +51,7 @@ Both transports serve the same `spicrawl_*` tools (25 are defined; the hosted en
 - **Extract structured data** with a CSS/XPath selector map (`extract`) or from the JSON-LD, OpenGraph, Twitter Card and microdata a page publishes (`autoparse`).
 - **Drive the page** before capture with 8 typed browser actions: `click`, `fill`, `wait_for`, `wait_for_navigation`, `scroll` (including infinite scroll), `select`, `evaluate` and `screenshot`.
 - **Return screenshots and PDFs the model can see**: screenshots arrive as MCP image blocks (up to 5 MB of base64 each) and printed pages as `application/pdf` resource blocks (up to 10 MB).
-- **Batch scrape thousands of URLs** as one async job, up to 10,000 items per call, with 9 tools to submit, poll, page through results, retry, cancel and keep a job open for crawling.
+- **Batch scrape thousands of URLs** as one async job, up to 10,000 items per call, with 9 tools to submit, poll, page through results, retry, cancel and keep a job open so you can append URLs as you discover them.
 - **Keep a logged-in browser** with persistent sessions: cookies, storage and a fixed rendering tier reused across scrapes.
 - **Answer "what did that cost?"** from usage and request-log tools, and **read the Spicrawl docs** from inside the agent.
 
@@ -70,7 +70,7 @@ Check each site's terms and `robots.txt` before you scrape it.
 - If the page is blank or a skeleton without JavaScript, call `spicrawl_scrape` again with `render: true`.
 - If you know the page's structure, use `extract` with CSS selectors; if you don't, try `autoparse`.
 - If you have more than about 20 URLs, use `spicrawl_batch_submit`, then `spicrawl_batch_status` and `spicrawl_batch_results`.
-- If you discover URLs as you go (crawling), submit with `open: true`, append with `spicrawl_batch_add_items` and finish with `spicrawl_batch_close`.
+- If you discover URLs as you go, submit with `open: true`, append with `spicrawl_batch_add_items` and finish with `spicrawl_batch_close`.
 - If you must log in first, use `spicrawl_session_create` and pass its `id` as `session_id` to `spicrawl_scrape`.
 - If a call failed and you need to know why, use `spicrawl_request_get` with the request id, or `spicrawl_requests_list` with `only_errors`.
 - If you are unsure of a parameter or an error code, use `spicrawl_docs_search` before guessing.
