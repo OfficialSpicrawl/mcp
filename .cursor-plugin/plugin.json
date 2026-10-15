@@ -1,0 +1,32 @@
+{
+  "name": "spicrawl",
+  "displayName": "Spicrawl",
+  "version": "0.1.7",
+  "description": "Web scraping for AI agents: turn any URL into Markdown, HTML, text or JSON, with JavaScript rendering, batch jobs, screenshots and login sessions, through the hosted Spicrawl MCP server.",
+  "author": {
+    "name": "Spicrawl",
+    "email": "dev@spicrawl.com"
+  },
+  "homepage": "https://docs.spicrawl.com/agents/mcp",
+  "repository": "https://github.com/OfficialSpicrawl/mcp",
+  "license": "Apache-2.0",
+  "logo": "assets/logo-400.png",
+  "keywords": [
+    "Web Scraping",
+    "MCP",
+    "Markdown",
+    "JSON",
+    "JavaScript Rendering",
+    "Crawler",
+    "Batch Jobs",
+    "Screenshots",
+    "PDF",
+    "Data Extraction",
+    "AI Agents",
+    "RAG",
+    "LLM"
+  ],
+  "category": "integrations",
+  "tags": ["web-scraping", "mcp", "markdown", "crawler", "data-extraction", "ai-agents"],
+  "mcpServers": "./mcp.json"
+}
