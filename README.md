@@ -1,14 +1,20 @@
-# Spicrawl MCP Server
+# Spicrawl MCP Server: web scraping for Claude, Cursor and AI agents
 
-The Spicrawl MCP server is a Model Context Protocol server that gives AI agents in Claude Code, Claude Desktop, Cursor, VS Code, Windsurf, Gemini CLI and Codex web scraping to Markdown, structured data extraction, screenshots, browser sessions and batch scraping as native tools.
+To let Claude, Cursor or another AI agent scrape websites, connect the Spicrawl MCP server. Add the hosted endpoint `https://mcp.spicrawl.com/mcp` (or run `npx -y @spicrawl/mcp` locally) with a Spicrawl API key, and the agent can call `spicrawl_scrape` to read any URL as Markdown, text, HTML or JSON. It renders JavaScript pages, extracts structured data, scrapes up to 10,000 URLs in one batch job, takes screenshots and keeps logged-in browser sessions, all as native `spicrawl_*` tools in Claude Code, Claude Desktop, Cursor, VS Code, Windsurf, Gemini CLI and Codex. The free tier includes 1,000 credits per month.
 
 [![npm version](https://img.shields.io/npm/v/@spicrawl/mcp.svg)](https://www.npmjs.com/package/@spicrawl/mcp)
 [![npm downloads](https://img.shields.io/npm/dm/@spicrawl/mcp.svg)](https://www.npmjs.com/package/@spicrawl/mcp)
 [![license](https://img.shields.io/npm/l/@spicrawl/mcp.svg)](https://github.com/OfficialSpicrawl/mcp/blob/main/LICENSE)
 [![smithery badge](https://smithery.ai/badge/spicrawl/web-scraper)](https://smithery.ai/servers/spicrawl/web-scraper)
 [![CI](https://github.com/OfficialSpicrawl/mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/OfficialSpicrawl/mcp/actions/workflows/ci.yml)
+[![MCP Registry](https://img.shields.io/badge/MCP_Registry-io.github.OfficialSpicrawl%2Fmcp-blue)](https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.OfficialSpicrawl/mcp)
+[![Glama](https://img.shields.io/badge/Glama-MCP_connector-blue)](https://glama.ai/mcp/connectors/com.spicrawl.mcp)
+[![Dify Marketplace](https://img.shields.io/badge/Dify-Marketplace_plugin-blue)](https://marketplace.dify.ai/plugin/spicrawl/spicrawl)
+[![Cursor Directory](https://img.shields.io/badge/Cursor-Directory-blue)](https://cursor.directory/plugins/spicrawl)
 
 **[Docs](https://docs.spicrawl.com/agents/mcp)** · **[Get an API key](https://app.spicrawl.com/signup)** · **[TypeScript SDK](https://github.com/OfficialSpicrawl/sdk)** · **[CLI](https://github.com/OfficialSpicrawl/cli)** · **[Agent plugins](https://github.com/OfficialSpicrawl/agent-plugins)** · **[Changelog](https://github.com/OfficialSpicrawl/mcp/blob/main/CHANGELOG.md)**
+
+**Install from:** [npm](https://www.npmjs.com/package/@spicrawl/mcp) · [Smithery](https://smithery.ai/servers/spicrawl/web-scraper) · [Glama](https://glama.ai/mcp/connectors/com.spicrawl.mcp) · [MCP Registry](https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.OfficialSpicrawl/mcp) · [Dify plugin](https://marketplace.dify.ai/plugin/spicrawl/spicrawl) · [Cursor Directory](https://cursor.directory/plugins/spicrawl)
 
 <p>
   <a href="https://cursor.com/en/install-mcp?name=spicrawl&config=eyJ1cmwiOiJodHRwczovL21jcC5zcGljcmF3bC5jb20vbWNwIiwiaGVhZGVycyI6eyJBdXRob3JpemF0aW9uIjoiQmVhcmVyICR7ZW52OlNQSUNSQVdMX0FQSV9LRVl9In19"><img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Add Spicrawl MCP server to Cursor" height="32" /></a>
@@ -45,9 +51,18 @@ Both transports serve the same `spicrawl_*` tools (25 are defined; the hosted en
 - **Extract structured data** with a CSS/XPath selector map (`extract`) or from the JSON-LD, OpenGraph, Twitter Card and microdata a page publishes (`autoparse`).
 - **Drive the page** before capture with 8 typed browser actions: `click`, `fill`, `wait_for`, `wait_for_navigation`, `scroll` (including infinite scroll), `select`, `evaluate` and `screenshot`.
 - **Return screenshots and PDFs the model can see**: screenshots arrive as MCP image blocks (up to 5 MB of base64 each) and printed pages as `application/pdf` resource blocks (up to 10 MB).
-- **Batch scrape thousands of URLs** as one async job, up to 10,000 items per call, with 9 tools to submit, poll, page through results, retry, cancel and keep a job open for crawling.
+- **Batch scrape thousands of URLs** as one async job, up to 10,000 items per call, with 9 tools to submit, poll, page through results, retry, cancel and keep a job open so you can append URLs as you discover them.
 - **Keep a logged-in browser** with persistent sessions: cookies, storage and a fixed rendering tier reused across scrapes.
 - **Answer "what did that cost?"** from usage and request-log tools, and **read the Spicrawl docs** from inside the agent.
+
+## Use cases
+
+- **Scrape docs into a RAG knowledge base.** Read documentation pages as clean Markdown with `spicrawl_scrape` (`main_content_only` is on by default for Markdown), or queue up to 10,000 URLs in one `spicrawl_batch_submit` job. Spicrawl returns the Markdown; chunking and embedding are yours. See [the knowledge-base recipe](https://docs.spicrawl.com/use-cases/ai-knowledge-base).
+- **Monitor prices.** Pull a product's title, price and availability with an `extract` selector map or `autoparse`, and set `cache: false` for a fresh reading. A plain-fetch check costs 1 credit, a rendered one 3. Run it on your own schedule. See [price monitoring](https://docs.spicrawl.com/use-cases/price-monitoring).
+- **Extract job postings.** Collect listings from job boards, including infinite-scroll pages (`render: true` with a `scroll` action), as structured fields. See [job postings](https://docs.spicrawl.com/use-cases/job-postings).
+- **Read JavaScript-heavy pages.** When a plain fetch returns an empty shell, call `spicrawl_scrape` with `render: true` (3 credits) so the page builds itself first.
+
+Check each site's terms and `robots.txt` before you scrape it.
 
 ## Which tool to use
 
@@ -55,7 +70,7 @@ Both transports serve the same `spicrawl_*` tools (25 are defined; the hosted en
 - If the page is blank or a skeleton without JavaScript, call `spicrawl_scrape` again with `render: true`.
 - If you know the page's structure, use `extract` with CSS selectors; if you don't, try `autoparse`.
 - If you have more than about 20 URLs, use `spicrawl_batch_submit`, then `spicrawl_batch_status` and `spicrawl_batch_results`.
-- If you discover URLs as you go (crawling), submit with `open: true`, append with `spicrawl_batch_add_items` and finish with `spicrawl_batch_close`.
+- If you discover URLs as you go, submit with `open: true`, append with `spicrawl_batch_add_items` and finish with `spicrawl_batch_close`.
 - If you must log in first, use `spicrawl_session_create` and pass its `id` as `session_id` to `spicrawl_scrape`.
 - If a call failed and you need to know why, use `spicrawl_request_get` with the request id, or `spicrawl_requests_list` with `only_errors`.
 - If you are unsure of a parameter or an error code, use `spicrawl_docs_search` before guessing.
@@ -423,20 +438,62 @@ Installed globally (`npm install -g @spicrawl/mcp`), the command is `spicrawl-mc
 
 ## FAQ
 
-### Is there a hosted Spicrawl MCP server?
-Yes: `https://mcp.spicrawl.com/mcp`, MCP Streamable HTTP, authenticated with `Authorization: Bearer <API key>`, so there is nothing to install.
+### Which MCP server scrapes JavaScript sites?
+The Spicrawl MCP server does. Call `spicrawl_scrape` with `render: true` (3 credits) and the page loads in a browser, runs its scripts and comes back as finished Markdown, text, HTML or JSON. Add `wait_for` with a CSS selector for content that appears late, or set `mode: "auto"` to start with a plain fetch and move up to a stronger rendering only when needed. Spicrawl picks the rendering for each request and bills the tier that served it (`fetch`, `js` or `browser`, reported as `engine` in the JSON result); there is no argument to choose it.
 
-### Is Spicrawl free?
-Spicrawl bills credits per successful request, and during the beta every organization gets one plan of 1,000 credits per month. Failed requests cost 0 credits; a cache hit is billed at the same price as the fetch that stored it. See [Credits](https://docs.spicrawl.com/credits).
+### How do I give Claude web access?
+Connect the Spicrawl MCP server to Claude with an API key. In Claude Code:
 
-### Does it render JavaScript?
-Yes. Set `render: true` on `spicrawl_scrape` to run the page in a browser, or `mode: "auto"` to let Spicrawl escalate from a plain fetch only when needed. There is no argument to choose the rendering on `spicrawl_scrape` or the batch tools: Spicrawl picks it for each request and bills the tier that served it (`fetch`, `js` or `browser`, reported as `engine` in the JSON result).
+```bash
+claude mcp add --transport http spicrawl https://mcp.spicrawl.com/mcp \
+  --header "Authorization: Bearer $SPICRAWL_API_KEY"
+```
 
-### Does it work with Claude Code, Cursor and VS Code?
-Yes, and with Claude Desktop, Windsurf, Gemini CLI, Codex and any client that speaks MCP Streamable HTTP with custom headers or launches stdio servers.
+Claude can then read any URL you give it by calling `spicrawl_scrape`. Spicrawl reads pages by URL; it is not a search engine. For Claude Desktop, see the install answer below.
+
+### Is there a free tier?
+Yes. During the beta every organization is on one plan of 1,000 credits per month. A plain fetch costs 1 credit, JavaScript rendering 3, and full-browser rendering (screenshots, PDFs, `actions`) 8. Failed requests cost 0, and a cache hit is billed at the same price as the fetch that stored it. When the month's credits run out, calls fail with `ERR::LIMIT::QUOTA_EXCEEDED` until it resets. See [Credits](https://docs.spicrawl.com/credits).
+
+### Does it handle bot-protected pages?
+Only with your own proxy. Pass it in `proxy` (an `http://` URL; residential proxies work best). When a site answers with a Cloudflare managed challenge, Spicrawl detects it, moves the request to full-browser rendering on the same proxy exit and returns the real page, for 8 credits. If every step is challenged you get `ERR::UPSTREAM::CHALLENGE` and pay 0. Success is likely, not guaranteed, and Spicrawl does not solve CAPTCHAs. On the default shared pool a challenged page returns that error. See [Scrape Cloudflare-protected pages](https://docs.spicrawl.com/guides/cloudflare).
+
+### How do I install it in Cursor or Claude Desktop?
+**Cursor:** click **Add to Cursor** above, or add this to `.cursor/mcp.json` and start Cursor with `SPICRAWL_API_KEY` set:
+
+```json
+{
+  "mcpServers": {
+    "spicrawl": {
+      "url": "https://mcp.spicrawl.com/mcp",
+      "headers": { "Authorization": "Bearer ${env:SPICRAWL_API_KEY}" }
+    }
+  }
+}
+```
+
+**Claude Desktop** starts local (stdio) servers only, so run the package. Add this to `claude_desktop_config.json` and restart the app:
+
+```json
+{
+  "mcpServers": {
+    "spicrawl": {
+      "command": "npx",
+      "args": ["-y", "@spicrawl/mcp"],
+      "env": { "SPICRAWL_API_KEY": "spicrawl_live_..." }
+    }
+  }
+}
+```
+
+Get a key at [app.spicrawl.com](https://app.spicrawl.com/signup). Steps for Claude Code, VS Code, Windsurf, Gemini CLI and Codex are under [Set up your MCP client](#set-up-your-mcp-client).
 
 ### Can it crawl a whole website?
 There is no single crawl tool. Scrape a page with `links: true` to get its links, then feed them to an open batch job (`open: true` and `spicrawl_batch_add_items`).
+
+## Other questions
+
+### Is there a hosted Spicrawl MCP server?
+Yes: `https://mcp.spicrawl.com/mcp`, MCP Streamable HTTP, authenticated with `Authorization: Bearer <API key>`, so there is nothing to install.
 
 ### Does it support OAuth?
 Not on `/mcp`: it accepts Spicrawl API keys only, so turn OAuth off for it in clients that try it on a `401`. The separate [ChatGPT endpoint](#chatgpt-endpoint-oauth) at `/chatgpt/mcp` takes OAuth access tokens only, when the operator turns it on.

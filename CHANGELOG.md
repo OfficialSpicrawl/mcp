@@ -3,6 +3,13 @@
 All notable changes to `@spicrawl/mcp` are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.1.8 — 2026-10-15
+
+Listing copy and keywords; no code changes.
+
+- `package.json`, `server.json` and the Cursor plugin manifest: a search-led description and keywords, so npm search, the MCP Registry and cursor.directory match what people look for.
+- README: a first paragraph that answers how to let Claude or Cursor scrape websites, a use cases list, an FAQ and install links for each directory.
+
 ## 0.1.7 — 2026-10-13
 
 - Every tool now declares an MCP `outputSchema` and returns matching `structuredContent` next to the same text it always returned, so a client can read fields such as `credits`, `status` and `next_cursor` without parsing text. The schemas follow the API's OpenAPI and are deliberately open: every field but an id is optional, fields the API adds later pass through (`additionalProperties` is true), and values such as a job or session `status` and an `engine` are plain strings with the known values in the description, because a client rejects a result that fails its schema. A test fails if a schema ever uses an enum, a format or a closed object. An error is still a tool error with no `structuredContent`.

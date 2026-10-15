@@ -2,18 +2,18 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.OfficialSpicrawl/mcp",
   "title": "Spicrawl",
-  "description": "Web scraping to Markdown and structured data, screenshots, batch jobs and browser sessions.",
+  "description": "Web scraping MCP server: any URL to Markdown or JSON, with JavaScript rendering and batch jobs.",
   "repository": {
     "url": "https://github.com/OfficialSpicrawl/mcp",
     "source": "github"
   },
   "websiteUrl": "https://docs.spicrawl.com/agents/mcp",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@spicrawl/mcp",
-      "version": "0.1.7",
+      "version": "0.1.8",
       "transport": { "type": "stdio" },
       "environmentVariables": [
         {
