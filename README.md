@@ -5,7 +5,7 @@ To let Claude, Cursor or another AI agent scrape websites, connect the Spicrawl 
 [![npm version](https://img.shields.io/npm/v/@spicrawl/mcp.svg)](https://www.npmjs.com/package/@spicrawl/mcp)
 [![npm downloads](https://img.shields.io/npm/dm/@spicrawl/mcp.svg)](https://www.npmjs.com/package/@spicrawl/mcp)
 [![license](https://img.shields.io/npm/l/@spicrawl/mcp.svg)](https://github.com/OfficialSpicrawl/mcp/blob/main/LICENSE)
-[![smithery badge](https://smithery.ai/badge/spicrawl/web-scraper)](https://smithery.ai/servers/spicrawl/web-scraper)
+[![LightNow capabilities](https://lightnow.ai/badge/io.github.OfficialSpicrawl/mcp)](https://lightnow.ai/servers/io.github.OfficialSpicrawl/mcp)
 [![CI](https://github.com/OfficialSpicrawl/mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/OfficialSpicrawl/mcp/actions/workflows/ci.yml)
 [![MCP Registry](https://img.shields.io/badge/MCP_Registry-io.github.OfficialSpicrawl%2Fmcp-blue)](https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.OfficialSpicrawl/mcp)
 [![Glama](https://img.shields.io/badge/Glama-MCP_connector-blue)](https://glama.ai/mcp/connectors/com.spicrawl.mcp)
