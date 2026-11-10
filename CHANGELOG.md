@@ -3,7 +3,7 @@
 All notable changes to `@spicrawl/mcp` are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 0.1.9 — 2026-11-10
 
 Tool descriptions follow three API changes; no argument names or types changed.
 

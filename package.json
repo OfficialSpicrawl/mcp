@@ -1,6 +1,6 @@
 {
   "name": "@spicrawl/mcp",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "mcpName": "io.github.OfficialSpicrawl/mcp",
   "description": "MCP server for web scraping and data extraction: turn any website into LLM-ready Markdown or JSON for Claude, Cursor and AI agents. Render JavaScript, extract structured data, manage sessions, batch scrape at scale, and access global data with residential proxies.",
   "license": "Apache-2.0",
