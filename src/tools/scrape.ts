@@ -15,20 +15,22 @@ const ScrapeInput = {
     .boolean()
     .default(false)
     .describe(
-      "Render with a real browser (executes JavaScript). Use for single-page apps or pages whose content is painted client-side. Costs more than the default fetch tier.",
+      "Render with a real browser (executes JavaScript). Use for single-page apps or pages whose content is painted client-side. Costs more than the default fetch tier. " +
+        "A plain fetch that gets only a near-empty script page (a bot challenge) fails with ERR::UPSTREAM::CHALLENGE and bills nothing; retry with `render: true` or your own `proxy`.",
     ),
   format: z
     .enum(["markdown", "text", "html", "json", "pdf"])
     .default("markdown")
     .describe(
-      "Output format. 'markdown' (default) is best for feeding to an LLM; 'html' returns the raw document; 'json' returns a structured envelope; " +
+      "Output format. 'markdown' (default) is best for feeding to an LLM; 'html' returns the raw document; " +
+        "'json' returns the main content as markdown in `content` plus `sections` ([{level, heading, text}], split on headings); " +
         "'pdf' prints the page in a full browser (routed there for you) and returns the file as a resource content block.",
     ),
   main_content_only: z
     .boolean()
     .optional()
     .describe(
-      "Strip the page to its main article, dropping nav/footer/aside. Defaults on for markdown.",
+      "Strip the page to its main article, dropping nav/footer/aside. Defaults on for markdown and json.",
     ),
   include_tags: z
     .array(z.string())
@@ -46,7 +48,9 @@ const ScrapeInput = {
     .record(z.any())
     .optional()
     .describe(
-      'Selector-based extraction: a map of field -> CSS/XPath selector, e.g. {"title":"h1","price":".amount"}. Returns structured `data`. Precise and cheap when you know the page structure.',
+      'Selector-based extraction: a map of field -> CSS/XPath selector, e.g. {"title":"h1","price":".amount"}. Returns structured `data`. ' +
+        'A trailing `[]` returns every match as an array, e.g. {"titles":".titleline > a[]","links":"a[]@href"}; without it only the first match is returned. ' +
+        'The full form {"selector":"...","kind":"list"} also works. Precise and cheap when you know the page structure.',
     ),
   ai_extract: z
     .object({

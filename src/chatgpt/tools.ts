@@ -252,16 +252,16 @@ function registerChatgptTools(server: ChatgptMcpServer, client: ILayerClient, ct
         url: httpURL.describe("The absolute http:// or https:// URL to fetch."),
         format: format
           .default("markdown")
-          .describe("Output format: 'markdown' (default), 'text', 'html', or 'json' for an envelope with the content and metadata."),
-        render: z.boolean().default(false).describe("Load the page in a browser and run its JavaScript before capturing. Costs more than a plain fetch."),
-        main_content_only: z.boolean().optional().describe("Keep only the page's main content, dropping navigation, headers and footers. On by default for markdown."),
+          .describe("Output format: 'markdown' (default), 'text', 'html' (the raw document), or 'json' for the main content as markdown in `content` plus `sections` ([{level, heading, text}], split on headings)."),
+        render: z.boolean().default(false).describe("Load the page in a browser and run its JavaScript before capturing. Costs more than a plain fetch. A plain fetch that gets only a bot-challenge stub fails with ERR::UPSTREAM::CHALLENGE and bills nothing; retry with render."),
+        main_content_only: z.boolean().optional().describe("Keep only the page's main content, dropping navigation, headers and footers. On by default for markdown and json."),
         include_tags: z.array(z.string().min(1)).max(50).optional().describe("CSS selectors to keep; everything else is dropped."),
         exclude_tags: z.array(z.string().min(1)).max(50).optional().describe("CSS selectors to remove, e.g. ['nav', '.ad']."),
         links: z.boolean().default(false).describe("Also return the page's links as an absolute, de-duplicated list."),
         extract: z
           .record(z.string().min(1))
           .optional()
-          .describe('Fields to pull with CSS selectors, as a map of field name to selector, e.g. {"title":"h1","price":".amount"}. Returned under `data`.'),
+          .describe('Fields to pull with CSS selectors, as a map of field name to selector, e.g. {"title":"h1","price":".amount"}. Returned under `data`. A trailing `[]` returns every match as an array, e.g. {"titles":".titleline > a[]"}.'),
         autoparse: z.boolean().optional().describe("Return the structured data the page publishes about itself (JSON-LD, OpenGraph, microdata) under `data`."),
         wait_for: z.string().min(1).optional().describe("CSS selector to wait for before capturing. Only with `render`."),
         cache: z.boolean().optional().describe("Accept a recent cached copy (default on). A cache hit is billed like a fetch. Set false for live data."),
