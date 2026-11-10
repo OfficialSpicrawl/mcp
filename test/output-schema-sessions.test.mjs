@@ -17,6 +17,8 @@ const TOOLS = [
   "spicrawl_session_release",
   "spicrawl_session_delete",
   "spicrawl_browser_connect_url",
+  "spicrawl_browser_live_view",
+  "spicrawl_browser_control",
 ];
 
 const SESSION = {

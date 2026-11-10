@@ -11,6 +11,8 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 
 const PKG_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
+export const LIVE_SESSION = "bs" + "0123456789abcdef01234567";
+
 export const VALID_KEY = `spicrawl_live_${"a".repeat(52)}`;
 export const OTHER_VALID_KEY = `spicrawl_live_${"b".repeat(52)}`;
 export const UNKNOWN_KEY = `spicrawl_live_${"z".repeat(52)}`;
@@ -247,7 +249,22 @@ export async function startFakeApi() {
       for (const [k, v] of Object.entries(body ?? {})) q.set(k, String(v));
       q.set("token", "wbt_" + "t".repeat(43));
       const path = `/v1/browser?${q}`;
-      return json(200, { url: `ws://internal${path}`, path, expires_at: "2026-09-24T12:00:00Z", expires_in: 60, single_use: true });
+      return json(200, { url: `ws://internal${path}`, path, expires_at: "2026-09-24T12:00:00Z", expires_in: 60, single_use: true, session_id: LIVE_SESSION });
+    }
+    const live = p.match(/^\/v1\/browser\/sessions\/([^/]+)(\/live|\/takeover|\/release)?$/);
+    if (live) {
+      if (live[1] !== LIVE_SESSION) {
+        return problem(404, { title: "Not found", code: "ERR::REQUEST::NOT_FOUND", detail: "No open browser session has that id.", retryable: false });
+      }
+      if (req.method === "POST" && live[2] === "/live") {
+        // The API's own view of its host, as a hosted MCP behind loopback sees it.
+        const socket = `ws://internal/v1/browser/sessions/${LIVE_SESSION}/live?token=wbv_${"v".repeat(64)}`;
+        return json(200, { session_id: LIVE_SESSION, live_url: socket, live_view_url: `http://internal/v1/browser/live#${encodeURIComponent(socket)}`, expires_in: 60, single_use: true });
+      }
+      const controller = live[2] === "/takeover" ? "human" : "agent";
+      if ((req.method === "GET" && !live[2]) || (req.method === "POST" && live[2] !== "/live")) {
+        return json(200, { session_id: LIVE_SESSION, status: "running", controller, expires_at: "2026-09-24T12:03:00Z" });
+      }
     }
     if (req.method === "GET" && p === "/v1/batch/job_123") {
       return json(200, BATCH_JOB);
