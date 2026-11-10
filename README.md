@@ -46,9 +46,9 @@ Both transports serve the same `spicrawl_*` tools (25 are defined; the hosted en
 
 ## What it does
 
-- **Scrape any URL to Markdown**, text, HTML, a JSON envelope or a printed PDF with one tool, `spicrawl_scrape`. Markdown is the default and strips the page to its main content.
+- **Scrape any URL to Markdown**, text, HTML, a JSON envelope or a printed PDF with one tool, `spicrawl_scrape`. Markdown is the default and strips the page to its main content. `format: "json"` returns that main content as Markdown in `content`, plus `sections` (`{level, heading, text}` split on headings); use `format: "html"` for the raw document.
 - **Render JavaScript** with `render: true` (3 credits). A plain fetch costs 1 credit, screenshots, PDFs and `actions` use a full browser (8 credits), and `mode: "auto"` escalates from fetch to browser and bills only the rung that worked ([price table](https://docs.spicrawl.com/credits)). You never pick the rendering yourself; Spicrawl chooses the cheapest that can do what the request asks.
-- **Extract structured data** with a CSS/XPath selector map (`extract`) or from the JSON-LD, OpenGraph, Twitter Card and microdata a page publishes (`autoparse`).
+- **Extract structured data** with a CSS/XPath selector map (`extract`) or from the JSON-LD, OpenGraph, Twitter Card and microdata a page publishes (`autoparse`). A trailing `[]` on a selector returns every match as an array, e.g. `{"titles": ".titleline > a[]"}`; without it only the first match is returned.
 - **Drive the page** before capture with 8 typed browser actions: `click`, `fill`, `wait_for`, `wait_for_navigation`, `scroll` (including infinite scroll), `select`, `evaluate` and `screenshot`.
 - **Return screenshots and PDFs the model can see**: screenshots arrive as MCP image blocks (up to 5 MB of base64 each) and printed pages as `application/pdf` resource blocks (up to 10 MB).
 - **Batch scrape thousands of URLs** as one async job, up to 10,000 items per call, with 9 tools to submit, poll, page through results, retry, cancel and keep a job open so you can append URLs as you discover them.
@@ -510,6 +510,7 @@ Use the MCP server when an AI agent should call Spicrawl as tools. Use [`@spicra
 | HTTP `503` with `Retry-After` on connect | The server could not reach the API to check your key. Retry; your key is fine. |
 | `ERR::AUTH::INSUFFICIENT_SCOPE` from a `spicrawl_usage*` tool | Grant the key the `read` scope in the dashboard. |
 | `ERR::LIMIT::QUOTA_EXCEEDED` (HTTP 402) | The monthly credit allowance is used up. Not retryable until it resets. |
+| `ERR::UPSTREAM::CHALLENGE` at 0 credits | A plain fetch got a near-empty, script-driven page (a bot challenge stub), so nothing was billed. Retry with `render: true`, or pass your own `proxy`. `mode: "auto"` escalates past it on its own. |
 | "Unknown argument" on `spicrawl_scrape` | Use the tool's names: `render`, not `js_render`; `format`, not `response_format`. |
 | Tools do not appear | Restart the client, and check the config key (`servers` in VS Code, `mcpServers` elsewhere). |
 | `npx` not found (stdio) | Install Node.js 20 or later. |

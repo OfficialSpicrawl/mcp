@@ -3,6 +3,14 @@
 All notable changes to `@spicrawl/mcp` are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+Tool descriptions follow three API changes; no argument names or types changed.
+
+- **Changed:** `spicrawl_scrape` with `format: "json"` returns the page's main content as Markdown in `content` (it was raw HTML), plus a new `sections` array of `{level, heading, text}` split on headings. `main_content_only` now defaults on for json as well as markdown. Raw HTML is still `format: "html"`. `spicrawl_batch_submit` `json` is unchanged and still returns the raw HTML document.
+- **Added:** `extract` takes a trailing `[]` on a selector to return every match as an array, e.g. `{"titles": ".titleline > a[]"}` or `{"links": "a[]@href"}`. The full form `{"selector": "...", "kind": "list"}` also works. Without `[]` only the first match is returned.
+- **Changed:** a plain fetch that gets a near-empty, script-driven page (a bot challenge stub) fails with `ERR::UPSTREAM::CHALLENGE` at 0 credits instead of billing the stub. The `render` description and the README troubleshooting table say how to get past it.
+
 ## 0.1.8 — 2026-10-15
 
 Listing copy and keywords; no code changes.

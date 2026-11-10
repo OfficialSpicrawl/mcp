@@ -176,7 +176,7 @@ const sharedParams = {
     .enum(["markdown", "text", "html", "json"])
     .optional()
     .describe(
-      "Output format for every item (`response_format`). spicrawl_batch_submit defaults to 'markdown', the same as spicrawl_scrape; an item's own `response_format` overrides it.",
+      "Output format for every item (`response_format`). spicrawl_batch_submit defaults to 'markdown', the same as spicrawl_scrape; an item's own `response_format` overrides it. 'json' returns the raw HTML document, not the markdown `content` and `sections` of spicrawl_scrape.",
     ),
   main_content_only: z.boolean().optional().describe("Strip each page to its main article."),
   premium_proxy: z.boolean().optional().describe(COMING_SOON + "Use residential managed-pool exits for every URL."),
