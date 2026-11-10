@@ -6,6 +6,7 @@ import { after, before, describe, test } from "node:test";
 import {
   ARRAY_PAYLOAD,
   BATCH_JOB,
+  LIVE_SESSION,
   MARKDOWN_PAYLOAD,
   PDF_BYTES,
   PNG_1X1,
@@ -223,6 +224,7 @@ describe("browser connect url", () => {
     assert.ok(u.searchParams.get("token")?.startsWith("wbt_"));
     assert.equal(u.searchParams.get("proxy_country"), "de");
     assert.equal(out.single_use, true);
+    assert.equal(out.session_id, LIVE_SESSION, "the session id for the live view is passed through");
     const text = JSON.stringify(res);
     assert.ok(!text.includes("spicrawl_live_"), "a key appeared in the tool result");
     assert.ok(!/api_?key=/.test(text), "a key parameter appeared in the tool result");
@@ -250,6 +252,46 @@ describe("browser connect url", () => {
   test("an API refusal surfaces as a tool error", async () => {
     const res = await call("spicrawl_browser_connect_url", { proxy_country: "zz" });
     assert.equal(res.isError, true);
+  });
+});
+
+describe("browser live view and control", () => {
+  test("the live view link is rebuilt on the public base and keeps its single-use socket", async () => {
+    const res = await call("spicrawl_browser_live_view", { session_id: LIVE_SESSION });
+    assert.equal(res.isError ?? false, false, `tool error: ${res.content?.[0]?.text}`);
+    const posted = api.requests.filter((r) => r.method === "POST" && r.path === `/v1/browser/sessions/${LIVE_SESSION}/live`).at(-1);
+    assert.ok(posted, "no POST .../live");
+    assert.match(posted.auth, /^Bearer spicrawl_live_/);
+    const out = res.structuredContent;
+    const socket = new URL(out.live_url);
+    assert.equal(socket.host, new URL(api.url).host, "the socket is on the public base, not the API's internal host");
+    assert.equal(socket.pathname, `/v1/browser/sessions/${LIVE_SESSION}/live`);
+    assert.ok(socket.searchParams.get("token").startsWith("wbv_"));
+    const page = new URL(out.live_view_url);
+    assert.equal(page.host, new URL(api.url).host);
+    assert.equal(page.pathname, "/v1/browser/live");
+    assert.equal(decodeURIComponent(page.hash.slice(1)), out.live_url, "the page carries the socket in its fragment");
+    assert.ok(!JSON.stringify(res).includes("spicrawl_live_"), "a key appeared in the tool result");
+  });
+
+  test("control reads status by default and posts takeover and release", async () => {
+    const status = await call("spicrawl_browser_control", { session_id: LIVE_SESSION });
+    assert.equal(status.structuredContent.controller, "agent");
+    const taken = await call("spicrawl_browser_control", { session_id: LIVE_SESSION, action: "takeover" });
+    assert.equal(taken.structuredContent.controller, "human");
+    assert.ok(api.requests.some((r) => r.method === "POST" && r.path === `/v1/browser/sessions/${LIVE_SESSION}/takeover`));
+    const back = await call("spicrawl_browser_control", { session_id: LIVE_SESSION, action: "release" });
+    assert.equal(back.structuredContent.controller, "agent");
+  });
+
+  test("a malformed session id is refused before any request; an unknown one is a tool error", async () => {
+    const before = api.requests.length;
+    const bad = await call("spicrawl_browser_control", { session_id: "../keys" });
+    assert.ok(bad.isError || bad.rpcError, "a path-like id was accepted");
+    assert.equal(api.requests.length, before, "a malformed id reached the API");
+    const gone = await call("spicrawl_browser_live_view", { session_id: "bs" + "f".repeat(24) });
+    assert.equal(gone.isError, true);
+    assert.match(gone.content[0].text, /NOT_FOUND/);
   });
 });
 

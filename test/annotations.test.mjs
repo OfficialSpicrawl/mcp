@@ -55,8 +55,12 @@ const TOOLS = {
   spicrawl_requests_list: ["List recent requests", true, false, false],
   spicrawl_request_get: ["Get one request", true, false, false],
 
-  // Mints a token and opens a browser that can go anywhere on the web. Hidden while it always fails.
+  // Mints a token and opens a browser that can go anywhere on the web.
   spicrawl_browser_connect_url: ["Browser (CDP) connect URL", false, false, true],
+  // Mints a single-use viewer link to that browser.
+  spicrawl_browser_live_view: ["Live view link for a remote browser", false, false, true],
+  // Reads or flips who drives the session; same call, same state.
+  spicrawl_browser_control: ["Who controls a remote browser", false, false, false],
 
   // Reads the public docs site.
   spicrawl_docs_search: ["Search the Spicrawl docs", true, false, true],
@@ -114,8 +118,8 @@ function descriptions(schema, out = []) {
 const hints = (t) => [t.title, t.annotations.readOnlyHint, t.annotations.destructiveHint, t.annotations.openWorldHint];
 
 describe("tool annotations and titles", () => {
-  test("the table lists exactly the 25 registered tools", () => {
-    assert.equal(Object.keys(TOOLS).length, 25);
+  test("the table lists exactly the 27 registered tools", () => {
+    assert.equal(Object.keys(TOOLS).length, 27);
     assert.deepEqual(tools.map((t) => t.name).sort(), Object.keys(TOOLS).sort());
   });
 
@@ -232,11 +236,8 @@ describe("by default, everything is listed", () => {
 });
 
 describe("SPICRAWL_MCP_HIDE_UNAVAILABLE=1", () => {
-  test("the browser tool is not registered; the other 24 are, with their hints unchanged", () => {
-    assert.deepEqual(
-      hiddenTools.map((t) => t.name).sort(),
-      Object.keys(TOOLS).filter((n) => n !== BROWSER).sort(),
-    );
+  test("every tool is registered, the browser tools included, with their hints unchanged", () => {
+    assert.deepEqual(hiddenTools.map((t) => t.name).sort(), Object.keys(TOOLS).sort());
     for (const t of hiddenTools) assert.deepEqual(hints(t), TOOLS[t.name], t.name);
   });
 

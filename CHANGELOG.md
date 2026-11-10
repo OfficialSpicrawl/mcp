@@ -3,6 +3,14 @@
 All notable changes to `@spicrawl/mcp` are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+Remote browsers are available: the agent drives a hosted browser, and hands it to a person when a page needs one.
+
+- **Changed:** `spicrawl_browser_connect_url` is no longer "Coming soon" and is always listed, `SPICRAWL_MCP_HIDE_UNAVAILABLE` and the server card included. Its result adds `session_id`.
+- **Added:** `spicrawl_browser_live_view` returns a single-use link (`live_view_url`) a person opens to watch the agent's browser and take control of it, for logins, one-time codes and captchas. Links are rebuilt on `SPICRAWL_PUBLIC_BASE_URL`, like the connect URL.
+- **Added:** `spicrawl_browser_control` reads who drives the browser (`agent` or `human`), and can hand control over (`takeover`) or take it back (`release`). While a person drives, the agent's input and navigation fail with CDP error `-32001`; reads keep working.
+
 ## 0.1.9 — 2026-11-10
 
 Tool descriptions follow three API changes; no argument names or types changed.

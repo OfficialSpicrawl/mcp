@@ -65,8 +65,8 @@ function keywords(schema, path = "", out = []) {
 }
 
 describe("every tool declares an outputSchema", () => {
-  test("all tools, including the one hidden by SPICRAWL_MCP_HIDE_UNAVAILABLE", () => {
-    assert.equal(tools.length, 25);
+  test("all tools", () => {
+    assert.equal(tools.length, 27);
     const missing = tools.filter((t) => !t.outputSchema).map((t) => t.name);
     assert.deepEqual(missing, []);
     for (const t of tools) {
