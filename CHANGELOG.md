@@ -3,7 +3,7 @@
 All notable changes to `@spicrawl/mcp` are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 0.2.0 — 2026-11-10
 
 Remote browsers are available: the agent drives a hosted browser, and hands it to a person when a page needs one.
 

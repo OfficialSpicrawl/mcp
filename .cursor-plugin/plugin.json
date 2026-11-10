@@ -1,7 +1,7 @@
 {
   "name": "spicrawl",
   "displayName": "Spicrawl",
-  "version": "0.1.9",
+  "version": "0.2.0",
   "description": "MCP server for web scraping in Cursor: turn any URL into Markdown, HTML, text or JSON, with JavaScript rendering, batch jobs, screenshots and login sessions.",
   "author": {
     "name": "Spicrawl",
