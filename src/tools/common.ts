@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ILayerClient, ILayerError } from "../client.js";
+import { ILayerClient, ILayerError, TEXT_BODY } from "../client.js";
 import type { SpicrawlMcpServer } from "../server.js";
 
 /** How the server was asked to present itself; every tools module receives the same value. */
@@ -79,9 +79,31 @@ export async function run(
 ) {
   const rename = (text: string) => (argNames ? renameArgs(text, argNames) : text);
   try {
-    const { data, blocks } = attach ? attach(await fn()) : { data: await fn(), blocks: [] as Attached["blocks"] };
+    const attached = attach ? attach(await fn()) : { data: await fn(), blocks: [] as Attached["blocks"] };
+    const { data, blocks } = attached;
     if (argNames && isPlainObject(data) && Array.isArray(data.warnings)) {
       data.warnings = data.warnings.map((w) => (typeof w === "string" ? rename(w) : w));
+    }
+    // Notes: advice about the call (X-Note, or the body's `notes`), renamed like warnings.
+    // They stay in structuredContent in every case. A document keeps its first block as it
+    // was and gets the notes as a `Note:` block after it. An empty result has no document,
+    // so its first block is the notes.
+    const obj = isPlainObject(data) ? data : undefined;
+    const textBody = obj !== undefined && (obj as Record<PropertyKey, unknown>)[TEXT_BODY] === true;
+    // The client's marker is read once and removed: a symbol key would fail the SDK's
+    // structuredContent check.
+    if (obj) delete (obj as Record<PropertyKey, unknown>)[TEXT_BODY];
+    const notes = obj && Array.isArray(obj.notes) ? obj.notes.filter(isString).map(rename) : [];
+    if (obj && notes.length) obj.notes = notes;
+    if (obj && notes.length && (textBody || Object.keys(obj).length === 1)) {
+      const { notes: _notes, ...doc } = obj;
+      const noteText = { type: "text" as const, text: notes.map((n) => `Note: ${n}`).join("\n") };
+      const empty = Object.keys(doc).length === 0 || (textBody && doc.content === "");
+      if (empty) return { content: [noteText, ...blocks], structuredContent: obj };
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(doc, null, 2) }, ...blocks, noteText],
+        structuredContent: obj,
+      };
     }
     // MCP requires structuredContent to be a JSON object; an array, string or
     // null there makes the client reject the whole result (-32602). Some
@@ -104,11 +126,13 @@ export async function run(
       structuredContent: { content: data ?? null } as Record<string, unknown>,
     };
   } catch (err) {
+    // The hint: diagnostics.hint, else the notes joined; skipped when the message already says it.
+    const hint = err instanceof ILayerError ? (err.hint ?? (err.notes.length ? err.notes.join(" ") : undefined)) : undefined;
     const message =
       err instanceof ILayerError
         ? `${err.code}: ${err.message}${err.retryable ? " (retryable — the same request may succeed on a retry)" : ""}${
             err.docUrl ? `\nSee ${err.docUrl}` : ""
-          }`
+          }${hint && !err.message.includes(hint) ? `\nHint: ${hint}` : ""}`
         : err instanceof Error
           ? err.message
           : String(err);
@@ -117,6 +141,10 @@ export async function run(
       content: [{ type: "text" as const, text: rename(message) }],
     };
   }
+}
+
+function isString(v: unknown): v is string {
+  return typeof v === "string";
 }
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {

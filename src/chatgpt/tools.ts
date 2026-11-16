@@ -13,7 +13,7 @@ import { z } from "zod";
 import { ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import type { RegisteredTool, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AnySchema, ZodRawShapeCompat } from "@modelcontextprotocol/sdk/server/zod-compat.js";
-import { ILayerClient, ILayerError } from "../client.js";
+import { ILayerClient, ILayerError, TEXT_BODY } from "../client.js";
 import { SERVER_NAME, SERVER_VERSION, SpicrawlMcpServer, type RequiredToolAnnotations } from "../server.js";
 import { run } from "../tools/common.js";
 import { batchResults, jobPath } from "../tools/batch.js";
@@ -148,7 +148,7 @@ function pick(src: Obj, keys: readonly string[]): Obj {
 }
 
 /** A scrape result: the content, the site's status, the credits charged, and what the caller asked to extract. */
-const SCRAPE_KEYS = ["url", "final_url", "status", "content", "truncated", "credits", "warnings", "data", "empty_fields", "links"] as const;
+const SCRAPE_KEYS = ["url", "final_url", "status", "content", "truncated", "credits", "warnings", "data", "empty_fields", "links", "notes"] as const;
 /** A batch job: its id (needed to poll it), state, progress and cost. */
 const JOB_KEYS = ["id", "name", "status", "total_items", "estimated_credits", "error_code", "error_message", "warnings"] as const;
 const PROGRESS_KEYS = [
@@ -160,7 +160,12 @@ const ITEM_RESULT_KEYS = ["content", "bytes", "truncated", "omitted", "unavailab
 const ITEM_ERROR_KEYS = ["code", "retryable", "message"] as const;
 
 export function sanitizeScrape(data: unknown): unknown {
-  return isObj(data) ? pick(data, SCRAPE_KEYS) : data;
+  if (!isObj(data)) return data;
+  const out = pick(data, SCRAPE_KEYS);
+  // The client's text-body marker is a symbol, which pick() drops; run() needs it to
+  // put a text body's notes in their own block.
+  if ((data as Record<PropertyKey, unknown>)[TEXT_BODY] === true) (out as Record<PropertyKey, unknown>)[TEXT_BODY] = true;
+  return out;
 }
 
 export function sanitizeJob(data: unknown): unknown {

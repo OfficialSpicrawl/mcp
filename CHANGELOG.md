@@ -3,6 +3,13 @@
 All notable changes to `@spicrawl/mcp` are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.2.1 — 2026-11-16
+
+Advice from the API now reaches the agent: `spicrawl_scrape` returns the `X-Note` header and the body's `notes`, including on failed calls.
+
+- **Added:** a scrape's notes come back as `notes` in the JSON, or as `Note:` lines in a text block after a markdown, text or HTML page, so an empty refusal says why. Failed calls add a `Hint:` line to the error text.
+- **Changed:** notes name tool arguments (`render`, `format`), not REST names such as `js_render`, like warnings and errors already do.
+
 ## 0.2.0 — 2026-11-10
 
 Remote browsers are available: the agent drives a hosted browser, and hands it to a person when a page needs one.
