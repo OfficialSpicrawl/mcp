@@ -66,6 +66,23 @@ export function docsBaseFromEnv(env: NodeJS.ProcessEnv = process.env): string {
   return DEFAULT_DOCS_URL;
 }
 
+/**
+ * Marks the `{ content }` wrapper of a non-JSON body (markdown, text, html), so a tool
+ * can tell it from a JSON object. A symbol: JSON.stringify and Object.keys skip it, so
+ * it never reaches a tool result.
+ */
+export const TEXT_BODY = Symbol("textBody");
+
+/**
+ * The X-Note header as one note. fetch exposes only the joined value, so a repeated
+ * header (`", "`-joined) cannot be split again without breaking sentences that contain
+ * commas; it stays one string.
+ */
+function headerNotes(headers: Headers): string[] {
+  const note = headers.get("x-note");
+  return note ? [note] : [];
+}
+
 /** The RFC 7807 problem shape every Spicrawl error uses. */
 interface Problem {
   code?: string;
@@ -75,6 +92,9 @@ interface Problem {
   retryable?: boolean;
   target_status?: number | null;
   doc_url?: string;
+  /** Advice on why the request failed and what to change (string array). */
+  notes?: string[];
+  diagnostics?: { hint?: string };
 }
 
 /** A failed request, carrying the platform's own error code and guidance. */
@@ -83,6 +103,10 @@ export class ILayerError extends Error {
   readonly status: number;
   readonly retryable: boolean;
   readonly docUrl?: string;
+  /** Advice from the API about this failure (the body's `notes`, else X-Note). */
+  readonly notes: string[];
+  /** `diagnostics.hint`, the API's one-line advice on what to change. */
+  readonly hint?: string;
 
   constructor(status: number, problem: Problem, fallback: string) {
     const detail = problem.detail || problem.title || fallback;
@@ -92,6 +116,8 @@ export class ILayerError extends Error {
     this.status = problem.status ?? status;
     this.retryable = problem.retryable ?? status >= 500;
     this.docUrl = problem.doc_url;
+    this.notes = Array.isArray(problem.notes) ? problem.notes.filter((n) => typeof n === "string") : [];
+    this.hint = problem.diagnostics?.hint || undefined;
   }
 }
 
@@ -195,7 +221,14 @@ export class ILayerClient {
     } catch {
       // Not JSON: a scrape body (markdown/text/html) — or, on an error, a
       // gateway's page, which the check below still reports as a failure.
-      parsed = response.ok || response.headers.get("x-engine") !== null ? { content: text } : { detail: text };
+      parsed =
+        response.ok || response.headers.get("x-engine") !== null ? { content: text, [TEXT_BODY]: true } : { detail: text };
+    }
+    // X-Note advice travels beside the body. A body's own `notes` wins; otherwise the
+    // header's note is put on the object, so an empty refusal still explains itself.
+    const note = headerNotes(response.headers);
+    if (note.length && typeof parsed === "object" && parsed !== null && !Array.isArray((parsed as Problem).notes)) {
+      (parsed as Problem).notes = note;
     }
 
     // A non-2xx status is only an error when the body is a platform problem.
@@ -238,6 +271,8 @@ async function pdfPayload(response: Response): Promise<Record<string, unknown>> 
   const out: Record<string, unknown> = {
     pdf: { content_type: "application/pdf", size_bytes: bytes.length, encoding: "base64", data: bytes.toString("base64") },
   };
+  const notes = headerNotes(response.headers);
+  if (notes.length) out.notes = notes;
   const fields: Record<string, unknown> = {
     engine: header("x-engine"),
     status: number("x-target-status"),

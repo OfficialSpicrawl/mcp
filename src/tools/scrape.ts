@@ -166,6 +166,7 @@ const ScrapeOutput = loose({
   truncated: z.boolean().optional().describe("The target body exceeded the size cap and was cut."),
   headers: z.record(z.string()).nullish().describe("The target's response headers."),
   warnings: z.array(z.string()).nullish().describe("Advisories about the call, e.g. an ignored option."),
+  notes: z.array(z.string()).nullish().describe("Advice on this call: why a page was refused or came back empty, and what to change. Also sent as the X-Note header."),
   data: z.record(z.unknown()).nullish().describe("Output of `extract` or `autoparse`."),
   empty_fields: z.array(z.string()).nullish().describe("`extract` rules that matched nothing: usually a broken selector."),
   links: z.array(z.string()).nullish().describe("The page's links, absolute and de-duplicated, when `links` was set."),
