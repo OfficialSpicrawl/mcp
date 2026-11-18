@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { ILayerClient } from "../client.js";
-import { API_ARG_NAMES, COMING_SOON, availableOnly, loose, run, type RegisterTools } from "./common.js";
+import { API_ARG_NAMES, COMING_SOON, availableOnly, loose, renameArgs, run, type RegisterTools } from "./common.js";
 
 export const jobPath = (id: string) => `/v1/batch/${encodeURIComponent(id)}`;
 
@@ -34,6 +34,16 @@ export async function batchResults(
     results = [raw];
   } else {
     results = [];
+  }
+  // An item's error message, warnings and notes name the tool's arguments, as run() does for the top level.
+  for (const item of results) {
+    if (!item || typeof item !== "object") continue;
+    const it = item as { error?: { message?: unknown } | null; warnings?: unknown; notes?: unknown };
+    if (typeof it.error?.message === "string") it.error.message = renameArgs(it.error.message, API_ARG_NAMES);
+    for (const key of ["warnings", "notes"] as const) {
+      const list = it[key];
+      if (Array.isArray(list)) it[key] = list.map((s) => (typeof s === "string" ? renameArgs(s, API_ARG_NAMES) : s));
+    }
   }
   const out: Record<string, unknown> = { results };
   // The cursor travels in the X-Next-Cursor header, which the client does not expose.

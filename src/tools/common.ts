@@ -84,6 +84,15 @@ export async function run(
     if (argNames && isPlainObject(data) && Array.isArray(data.warnings)) {
       data.warnings = data.warnings.map((w) => (typeof w === "string" ? rename(w) : w));
     }
+    // A batch job's failure reason, on the job itself and on each job of a listing.
+    if (argNames && isPlainObject(data) && typeof data.error_message === "string") {
+      data.error_message = rename(data.error_message);
+    }
+    if (argNames && isPlainObject(data) && Array.isArray(data.batches)) {
+      for (const job of data.batches) {
+        if (isPlainObject(job) && typeof job.error_message === "string") job.error_message = rename(job.error_message);
+      }
+    }
     // Notes: advice about the call (X-Note, or the body's `notes`), renamed like warnings.
     // They stay in structuredContent in every case. A document keeps its first block as it
     // was and gets the notes as a `Note:` block after it. An empty result has no document,
