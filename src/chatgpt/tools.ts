@@ -268,6 +268,13 @@ function registerChatgptTools(server: ChatgptMcpServer, client: ILayerClient, ct
           .describe('Fields to pull with CSS selectors, as a map of field name to selector, e.g. {"title":"h1","price":".amount"}. Returned under `data`. A trailing `[]` returns every match as an array, e.g. {"titles":".titleline > a[]"}.'),
         autoparse: z.boolean().optional().describe("Return the structured data the page publishes about itself (JSON-LD, OpenGraph, microdata) under `data`."),
         wait_for: z.string().min(1).optional().describe("CSS selector to wait for before capturing. Only with `render`."),
+        scroll_pages: z
+          .number()
+          .int()
+          .min(0)
+          .max(20)
+          .optional()
+          .describe("Before capture, scroll to the bottom up to this many times, stopping once the page stops growing (infinite-scroll feeds, search results). Needs `render` and costs as a full-browser render. Default 0 (off); typical value 3-10."),
         cache: z.boolean().optional().describe("Accept a recent cached copy (default on). A cache hit is billed like a fetch. Set false for live data."),
         cache_ttl: z.number().int().min(0).optional().describe("Oldest cached copy to accept, in seconds (0 forces a fresh fetch)."),
         max_cost: z.number().int().min(1).default(5).describe("Refuse the call instead of running it if it would cost more than this many credits. Default 5."),
@@ -287,6 +294,7 @@ function registerChatgptTools(server: ChatgptMcpServer, client: ILayerClient, ct
       if (input.extract) params.extract = input.extract;
       if (input.autoparse !== undefined) params.autoparse = input.autoparse;
       if (input.wait_for !== undefined) params.wait_for = input.wait_for;
+      if (input.scroll_pages !== undefined) params.scroll_pages = input.scroll_pages;
       if (input.cache !== undefined) params.cache = input.cache;
       if (input.cache_ttl !== undefined) params.cache_ttl = input.cache_ttl;
       return call(
