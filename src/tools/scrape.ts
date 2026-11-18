@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { COMING_SOON, availableOnly, loose, run, type RegisterTools } from "./common.js";
+import { API_ARG_NAMES, COMING_SOON, availableOnly, loose, run, type RegisterTools } from "./common.js";
 import { attachScreenshots } from "./screenshots.js";
 import { attachPdf } from "./pdf.js";
 import { ActionsSchema, toApiActions } from "./actions.js";
@@ -192,13 +192,6 @@ const ScrapeOutput = loose({
   diagnostics: z.record(z.unknown()).nullish().describe("Which rendering tiers were tried, after an escalation."),
 });
 
-/**
- * API parameter names this tool exposes under a different argument name. An
- * API message saying "set `js_render=true`" is advice the agent cannot follow
- * with this tool's schema, so errors and warnings are rewritten.
- */
-const SCRAPE_ARG_NAMES: Record<string, string> = { js_render: "render", response_format: "format" };
-
 /** Arguments passed to the API unchanged: the tool uses the REST name. */
 const PASSTHROUGH = [
   "mode", "stealth", "method", "custom_headers", "session_id", "sticky_key",
@@ -270,7 +263,7 @@ server.registerTool(
       const pdf = attachPdf(shots.data, input.url, shots.blocks.length);
       return { data: pdf.data, blocks: [...shots.blocks, ...pdf.blocks] };
     };
-    return run(() => client.scrape(params), attach, SCRAPE_ARG_NAMES);
+    return run(() => client.scrape(params), attach, API_ARG_NAMES);
   },
 );
 };

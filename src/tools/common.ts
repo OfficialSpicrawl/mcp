@@ -152,6 +152,13 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 }
 
 /**
+ * API parameter names the batch and scrape tools expose under other argument
+ * names. Pass it as `run`'s arg-name map so errors, warnings and notes say the
+ * tool's names.
+ */
+export const API_ARG_NAMES: Record<string, string> = { js_render: "render", response_format: "format" };
+
+/**
  * Rewrite API parameter names to the tool's argument names, as whole
  * identifiers only: `js_render` becomes `render`, but `js_render_budget` or a
  * URL containing the word is left alone.
