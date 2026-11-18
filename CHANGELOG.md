@@ -3,7 +3,7 @@
 All notable changes to `@spicrawl/mcp` are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 0.2.3 — 2026-11-18
 
 - **Fixed:** per-item errors, warnings and notes in batch results, and a batch job's `error_message` (in status, submit, cancel and list), name tool arguments (`render`, `format`), not REST names such as `js_render`, the same as the top-level ones.
 
