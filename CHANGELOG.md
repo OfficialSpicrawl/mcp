@@ -3,6 +3,10 @@
 All notable changes to `@spicrawl/mcp` are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+- **Fixed:** the batch tools' notes, warnings and errors name their arguments (`render`, `format`), not REST names such as `js_render`, the same as `spicrawl_scrape` already did.
+
 ## 0.2.1 — 2026-11-16
 
 Advice from the API now reaches the agent: `spicrawl_scrape` returns the `X-Note` header and the body's `notes`, including on failed calls.

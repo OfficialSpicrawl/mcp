@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { ILayerClient } from "../client.js";
-import { COMING_SOON, availableOnly, loose, run, type RegisterTools } from "./common.js";
+import { API_ARG_NAMES, COMING_SOON, availableOnly, loose, run, type RegisterTools } from "./common.js";
 
 export const jobPath = (id: string) => `/v1/batch/${encodeURIComponent(id)}`;
 
@@ -315,7 +315,7 @@ export const registerBatchTools: RegisterTools = (server, client, { hideUnavaila
       if (input.failure_threshold !== undefined) body.failure_threshold = input.failure_threshold;
       if (input.credit_budget !== undefined) body.credit_budget = input.credit_budget;
       if (input.webhook_endpoint_id !== undefined) body.webhook_endpoint_id = input.webhook_endpoint_id;
-      return run(() => client.request("POST", "/v1/batch", body));
+      return run(() => client.request("POST", "/v1/batch", body), undefined, API_ARG_NAMES);
     },
   );
 
@@ -341,7 +341,7 @@ export const registerBatchTools: RegisterTools = (server, client, { hideUnavaila
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ status, limit, cursor }) =>
-      run(() => client.request("GET", withQuery("/v1/batch", { status, limit, cursor }))),
+      run(() => client.request("GET", withQuery("/v1/batch", { status, limit, cursor })), undefined, API_ARG_NAMES),
   );
 
   // -------------------------------------------------------------------------
@@ -358,7 +358,7 @@ export const registerBatchTools: RegisterTools = (server, client, { hideUnavaila
       outputSchema: batchJob,
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async ({ job_id }) => run(() => client.request("GET", jobPath(job_id))),
+    async ({ job_id }) => run(() => client.request("GET", jobPath(job_id)), undefined, API_ARG_NAMES),
   );
 
   // -------------------------------------------------------------------------
@@ -385,7 +385,7 @@ export const registerBatchTools: RegisterTools = (server, client, { hideUnavaila
       outputSchema: batchResultsOutput,
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async ({ job_id, status, limit, cursor }) => run(() => batchResults(client, job_id, { status, limit, cursor })),
+    async ({ job_id, status, limit, cursor }) => run(() => batchResults(client, job_id, { status, limit, cursor }), undefined, API_ARG_NAMES),
   );
 
   // -------------------------------------------------------------------------
@@ -408,7 +408,7 @@ export const registerBatchTools: RegisterTools = (server, client, { hideUnavaila
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ job_id, seq }) =>
-      run(() => client.request("GET", `${jobPath(job_id)}/tasks/${encodeURIComponent(String(seq))}/content`)),
+      run(() => client.request("GET", `${jobPath(job_id)}/tasks/${encodeURIComponent(String(seq))}/content`), undefined, API_ARG_NAMES),
   );
 
   // -------------------------------------------------------------------------
@@ -426,7 +426,7 @@ export const registerBatchTools: RegisterTools = (server, client, { hideUnavaila
       outputSchema: batchJob,
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
-    async ({ job_id }) => run(() => client.request("POST", `${jobPath(job_id)}/cancel`)),
+    async ({ job_id }) => run(() => client.request("POST", `${jobPath(job_id)}/cancel`), undefined, API_ARG_NAMES),
   );
 
   // -------------------------------------------------------------------------
@@ -443,7 +443,7 @@ export const registerBatchTools: RegisterTools = (server, client, { hideUnavaila
       outputSchema: batchRetryOutput,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },
-    async ({ job_id }) => run(() => client.request("POST", `${jobPath(job_id)}/retry`)),
+    async ({ job_id }) => run(() => client.request("POST", `${jobPath(job_id)}/retry`), undefined, API_ARG_NAMES),
   );
 
   // -------------------------------------------------------------------------
@@ -469,7 +469,7 @@ export const registerBatchTools: RegisterTools = (server, client, { hideUnavaila
       if (body.response_format === undefined) body.response_format = "markdown";
       if (input.urls) body.urls = input.urls;
       if (input.items) body.items = input.items;
-      return run(() => client.request("POST", `${jobPath(input.job_id)}/items`, body));
+      return run(() => client.request("POST", `${jobPath(input.job_id)}/items`, body), undefined, API_ARG_NAMES);
     },
   );
 
@@ -487,6 +487,6 @@ export const registerBatchTools: RegisterTools = (server, client, { hideUnavaila
       outputSchema: batchJob,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async ({ job_id }) => run(() => client.request("POST", `${jobPath(job_id)}/close`)),
+    async ({ job_id }) => run(() => client.request("POST", `${jobPath(job_id)}/close`), undefined, API_ARG_NAMES),
   );
 };

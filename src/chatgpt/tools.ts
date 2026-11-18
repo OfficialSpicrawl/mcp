@@ -15,7 +15,7 @@ import type { RegisteredTool, ToolCallback } from "@modelcontextprotocol/sdk/ser
 import type { AnySchema, ZodRawShapeCompat } from "@modelcontextprotocol/sdk/server/zod-compat.js";
 import { ILayerClient, ILayerError, TEXT_BODY } from "../client.js";
 import { SERVER_NAME, SERVER_VERSION, SpicrawlMcpServer, type RequiredToolAnnotations } from "../server.js";
-import { run } from "../tools/common.js";
+import { API_ARG_NAMES, run } from "../tools/common.js";
 import { batchResults, jobPath } from "../tools/batch.js";
 import { registerDocsTools } from "../tools/docs.js";
 import type { Scope } from "./oauth.js";
@@ -207,7 +207,6 @@ const httpURL = z
   .regex(/^https?:\/\//i, "only http:// and https:// URLs can be fetched");
 
 const format = z.enum(["markdown", "text", "html", "json"]);
-const SCRAPE_ARG_NAMES: Record<string, string> = { js_render: "render", response_format: "format" };
 const MAX_BATCH_URLS = 25;
 
 /** Runs a tool body; an upstream 401 becomes a tool error carrying a fresh OAuth challenge. */
@@ -307,7 +306,7 @@ function registerChatgptTools(server: ChatgptMcpServer, client: ILayerClient, ct
           }
           return sanitizeScrape(data);
         },
-        SCRAPE_ARG_NAMES,
+        API_ARG_NAMES,
       );
     },
   );
@@ -340,7 +339,7 @@ function registerChatgptTools(server: ChatgptMcpServer, client: ILayerClient, ct
       if (input.render !== undefined) body.js_render = input.render;
       if (input.main_content_only !== undefined) body.main_content_only = input.main_content_only;
       if (input.max_cost !== undefined) body.max_cost = input.max_cost;
-      return call(ctx, ["batch"], async () => sanitizeJob(await client.request("POST", "/v1/batch", body)), SCRAPE_ARG_NAMES);
+      return call(ctx, ["batch"], async () => sanitizeJob(await client.request("POST", "/v1/batch", body)), API_ARG_NAMES);
     },
   );
 
@@ -356,7 +355,8 @@ function registerChatgptTools(server: ChatgptMcpServer, client: ILayerClient, ct
       inputSchema: { job_id: jobId },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async ({ job_id }) => call(ctx, ["batch"], async () => sanitizeJob(await client.request("GET", jobPath(job_id)))),
+    async ({ job_id }) =>
+      call(ctx, ["batch"], async () => sanitizeJob(await client.request("GET", jobPath(job_id))), API_ARG_NAMES),
   );
 
   server.registerTool(
@@ -381,7 +381,7 @@ function registerChatgptTools(server: ChatgptMcpServer, client: ILayerClient, ct
         const page = await batchResults(client, job_id, { status, limit, cursor });
         await fillMissingContent(client, job_id, page);
         return sanitizeResults(page);
-      }),
+      }, API_ARG_NAMES),
   );
 }
 
