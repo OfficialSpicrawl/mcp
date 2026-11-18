@@ -294,7 +294,7 @@ const PROFILE = {
 const ARGS = {
   spicrawl_scrape: [
     ["url", "format", "render", "main_content_only", "include_tags", "exclude_tags", "links", "extract", "autoparse",
-      "wait_for", "cache", "cache_ttl", "max_cost"],
+      "wait_for", "cache", "cache_ttl", "max_cost", "scroll_pages"],
     ["url"],
   ],
   spicrawl_batch_submit: [["urls", "format", "render", "main_content_only", "max_cost", "credit_budget"], ["urls"]],

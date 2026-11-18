@@ -99,6 +99,15 @@ const ScrapeInput = {
     .min(0)
     .optional()
     .describe("Milliseconds to wait after load before capturing (render only)."),
+  scroll_pages: z
+    .number()
+    .int()
+    .min(0)
+    .max(20)
+    .optional()
+    .describe(
+      "Before capture, scroll to the bottom up to this many times, stopping once the page stops growing: loads infinite-scroll feeds, search results and timelines. Needs full-browser rendering and costs as such (like `actions`). Default 0 (off); typical value 3-10.",
+    ),
   // --- The rest of POST /v1/scrape, under the API's own names (passed through).
   mode: z.enum(["auto"]).optional().describe("Routing mode. `auto` lets the platform escalate fetch -> browser as needed, billing only the rung that worked."),
   stealth: z.boolean().optional().describe(COMING_SOON + "Stealth mode: render in a full browser hardened against bot detection. Default false."),
@@ -197,7 +206,7 @@ const PASSTHROUGH = [
   "mode", "stealth", "method", "custom_headers", "session_id", "sticky_key",
   "proxy_verify", "wait_for", "wait_for_timeout", "block_resources", "screenshot_fullpage",
   "screenshot_selector", "screenshot_format", "screenshot_quality", "autoparse", "extract_preset",
-  "network_capture", "parse_pdf", "max_cost", "original_status", "allowed_status_codes",
+  "network_capture", "parse_pdf", "max_cost", "original_status", "allowed_status_codes", "scroll_pages",
 ] as const;
 
 // What the description says about the one argument that only exists while it is not hidden.

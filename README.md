@@ -83,7 +83,7 @@ Check each site's terms and `robots.txt` before you scrape it.
 
 | Tool | What it does | Key parameters |
 |---|---|---|
-| `spicrawl_scrape` | Retrieve one URL as `markdown` (default), `text`, `html`, `json` or `pdf`, with optional rendering, extraction, links, screenshots and browser actions. | `url`, `format`, `render`, `mode`, `main_content_only`, `include_tags`, `exclude_tags`, `extract`, `autoparse`, `links`, `screenshot`, `actions`, `wait_for`, `session_id`, `proxy`, `cache`, `max_cost` |
+| `spicrawl_scrape` | Retrieve one URL as `markdown` (default), `text`, `html`, `json` or `pdf`, with optional rendering, extraction, links, screenshots and browser actions. | `url`, `format`, `render`, `mode`, `main_content_only`, `include_tags`, `exclude_tags`, `extract`, `autoparse`, `links`, `screenshot`, `actions`, `wait_for`, `scroll_pages`, `session_id`, `proxy`, `cache`, `max_cost` |
 
 ### Batch scrape many URLs
 
@@ -432,7 +432,7 @@ The endpoint lists six tools, each with explicit `readOnlyHint`/`destructiveHint
 
 | Tool | Scopes | Arguments |
 |---|---|---|
-| `spicrawl_scrape` | `scrape` | `url` (http/https only), `format` (`markdown`/`text`/`html`/`json`), `render`, `main_content_only`, `include_tags`, `exclude_tags`, `links`, `extract` (CSS selectors), `autoparse`, `wait_for`, `cache`, `cache_ttl`, `max_cost` (default 5). Always an HTTP GET. |
+| `spicrawl_scrape` | `scrape` | `url` (http/https only), `format` (`markdown`/`text`/`html`/`json`), `render`, `main_content_only`, `include_tags`, `exclude_tags`, `links`, `extract` (CSS selectors), `autoparse`, `wait_for`, `scroll_pages` (render, costs as a full browser), `cache`, `cache_ttl`, `max_cost` (default 5). Always an HTTP GET. |
 | `spicrawl_batch_submit` | `batch` | `urls` (1 to 25), `format`, `render`, `main_content_only`, `max_cost`, `credit_budget` (default 50). |
 | `spicrawl_batch_status` | `batch` | `job_id`. |
 | `spicrawl_batch_results` | `batch` | `job_id`, `status`, `limit` (default 25, max 100), `cursor`. |

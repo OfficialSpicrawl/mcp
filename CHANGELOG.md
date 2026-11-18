@@ -6,6 +6,7 @@ All notable changes to `@spicrawl/mcp` are documented here. This project follows
 ## Unreleased
 
 - **Fixed:** the batch tools' notes, warnings and errors name their arguments (`render`, `format`), not REST names such as `js_render`, the same as `spicrawl_scrape` already did.
+- **Added:** `scroll_pages` on `spicrawl_scrape` (0 to 20, default 0 = off). Before capture the browser scrolls to the bottom up to that many times, stopping once the page stops growing, for infinite-scroll feeds, search results and timelines. It needs full-browser rendering and is priced as full-browser rendering, like `actions`. The ChatGPT endpoint's `spicrawl_scrape` accepts it too.
 
 ## 0.2.1 — 2026-11-16
 
