@@ -207,6 +207,8 @@ const httpURL = z
   .regex(/^https?:\/\//i, "only http:// and https:// URLs can be fetched");
 
 const format = z.enum(["markdown", "text", "html", "json"]);
+// Batch returns no JSON envelope, so its format list leaves json out.
+const batchFormat = z.enum(["markdown", "text", "html"]);
 const MAX_BATCH_URLS = 25;
 
 /** Runs a tool body; an upstream 401 becomes a tool error carrying a fresh OAuth challenge. */
@@ -330,7 +332,7 @@ function registerChatgptTools(server: ChatgptMcpServer, client: ILayerClient, ct
         "`credit_budget` (default 50), and `max_cost` caps any single page.",
       inputSchema: {
         urls: z.array(httpURL).min(1).max(MAX_BATCH_URLS).describe(`The http:// or https:// URLs to fetch, 1 to ${MAX_BATCH_URLS}.`),
-        format: format.default("markdown").describe("Output format for every page: 'markdown' (default), 'text', 'html' or 'json'."),
+        format: batchFormat.default("markdown").describe("Output format for every page: 'markdown' (default), 'text' or 'html'."),
         render: z.boolean().optional().describe("Load every page in a browser and run its JavaScript before capturing. Costs more."),
         main_content_only: z.boolean().optional().describe("Keep only each page's main content."),
         max_cost: z.number().int().min(1).optional().describe("Most credits any ONE page may cost; a page over it is refused."),

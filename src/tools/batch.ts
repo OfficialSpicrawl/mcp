@@ -183,10 +183,10 @@ const batchAddItemsOutput = loose({
 const sharedParams = {
   render: z.boolean().optional().describe("Render every URL with a browser (`js_render`)."),
   format: z
-    .enum(["markdown", "text", "html", "json"])
+    .enum(["markdown", "text", "html"])
     .optional()
     .describe(
-      "Output format for every item (`response_format`). spicrawl_batch_submit defaults to 'markdown', the same as spicrawl_scrape; an item's own `response_format` overrides it. 'json' returns the raw HTML document, not the markdown `content` and `sections` of spicrawl_scrape.",
+      "Output format for every item (`response_format`): markdown, text or raw html. spicrawl_batch_submit defaults to 'markdown', the same as spicrawl_scrape; an item's own `response_format` overrides it. Batch does not return the JSON envelope; for `json` (markdown `content` and `sections`) use spicrawl_scrape.",
     ),
   main_content_only: z.boolean().optional().describe("Strip each page to its main article."),
   premium_proxy: z.boolean().optional().describe(COMING_SOON + "Use residential managed-pool exits for every URL."),
@@ -252,6 +252,10 @@ const itemsInput = {
             .string()
             .optional()
             .describe("Your own correlation id, echoed back on this item's result record."),
+          response_format: z
+            .enum(["markdown", "text", "html"])
+            .optional()
+            .describe("Output format for this item only (markdown, text or html; batch has no json)."),
         })
         .passthrough(),
     )
