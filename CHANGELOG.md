@@ -3,6 +3,11 @@
 All notable changes to `@spicrawl/mcp` are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.3.0 — 2026-11-23
+
+- **Added:** partner tools for a platform that resells Spicrawl to its own users: account summary and balance; users (list, read, rename, move tier, suspend, reactivate); usage per day and per user; tiers (list, create, update, delete); giving credits to a user. A partner key is offered these and the docs tools; any other key gets the same 27 tools as before. Creating a user is not offered, because its response carries that user's API key.
+- **Changed:** a session checks its key once with `GET /v1/key` when it opens. If the answer is missing or late, the session gets the standard tools.
+
 ## 0.2.5 — 2026-11-23
 
 - **Changed:** `spicrawl_scrape` with `screenshot: true` turns on `render` itself, instead of failing with ERR::REQUEST::INCOMPATIBLE_FLAGS.
