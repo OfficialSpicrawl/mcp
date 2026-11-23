@@ -33,6 +33,7 @@
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { ILayerClient, PACKAGE_VERSION } from "./client.js";
 import { buildServer } from "./server.js";
+import { keyInfo, toolProfile } from "./profile.js";
 
 const USAGE = `spicrawl-mcp ${PACKAGE_VERSION} — the Spicrawl MCP server
 
@@ -46,13 +47,15 @@ Docs: https://docs.spicrawl.com/agents/mcp
 `;
 
 async function stdio() {
-  const server = buildServer(
-    new ILayerClient({
-      apiKey: process.env.SPICRAWL_API_KEY ?? "",
-      baseURL: process.env.SPICRAWL_BASE_URL,
-      publicBaseURL: process.env.SPICRAWL_PUBLIC_BASE_URL,
-    }),
-  );
+  const client = new ILayerClient({
+    apiKey: process.env.SPICRAWL_API_KEY ?? "",
+    baseURL: process.env.SPICRAWL_BASE_URL,
+    publicBaseURL: process.env.SPICRAWL_PUBLIC_BASE_URL,
+  });
+  // Asked once at startup, as the HTTP server asks once per session.
+  const info = await keyInfo(client);
+  if (!info) console.error("key info unavailable: the standard tools are listed");
+  const server = buildServer(client, { profile: toolProfile(info) });
   const transport = new StdioServerTransport();
   await server.connect(transport);
   // stdout is the transport; logs go to stderr.

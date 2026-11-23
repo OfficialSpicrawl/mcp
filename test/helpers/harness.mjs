@@ -16,8 +16,149 @@ export const LIVE_SESSION = "bs" + "0123456789abcdef01234567";
 export const VALID_KEY = `spicrawl_live_${"a".repeat(52)}`;
 export const OTHER_VALID_KEY = `spicrawl_live_${"b".repeat(52)}`;
 export const UNKNOWN_KEY = `spicrawl_live_${"z".repeat(52)}`;
+/** A partner key: the partner scope and read, and no scrape. Its session gets the partner tools. */
+export const PARTNER_KEY = `spicrawl_live_${"c".repeat(52)}`;
 
-const VALID_KEYS = new Set([VALID_KEY, OTHER_VALID_KEY]);
+const VALID_KEYS = new Set([VALID_KEY, OTHER_VALID_KEY, PARTNER_KEY]);
+
+/** What GET /v1/key answers for each kind of key. */
+const KEY_INFO = {
+  ordinary: { key_id: "01KEYORD", name: "Default", prefix: "spicrawl_live_aaaa", scopes: ["scrape", "batch", "sessions"], environment: "live", organization: { id: "org_1", name: "Acme" }, partner: false, workspace_of_partner: false, created_at: "2026-11-18T09:00:00Z", expires_at: null },
+  partner: { key_id: "01KEYPART", name: "Partner", prefix: "spicrawl_live_cccc", scopes: ["partner", "read"], environment: "live", organization: { id: "org_partner", name: "Partner Co" }, partner: true, workspace_of_partner: false, created_at: "2026-11-18T09:00:00Z", expires_at: null },
+};
+
+const WORKSPACE_BASE = {
+  display_name: null, status: "active", created_at: "2026-11-18T09:00:00Z", free_credits: 250, free_used: 40,
+  wallet_cap: 500, wallet_cap_source: "tier", wallet_used: 120, wallet_used_source: "live",
+  window_resets_at: "2026-12-18T00:00:00Z", own_credits: 50, tier: { id: "tier_std", name: "Standard" },
+  requests_per_minute: 60, concurrency: 2,
+};
+
+/** The partner account behind PARTNER_KEY: one balance, two tiers, two users, and the credit assignments made so far. */
+export function partnerState() {
+  const workspace = (id, extra = {}) => ({ ...WORKSPACE_BASE, workspace_id: `ws_${id.replace(/[^a-z0-9]/gi, "")}`, external_user_id: id, ...extra });
+  return {
+    balance: {
+      funded_credits: 1000, credit_line_credits: 0, spent_credits: 120, balance_credits: 880, available_credits: 880,
+      funded_micro: 1000000000, credit_line_micro: 0, spent_micro: 120000000, balance_micro: 880000000, available_micro: 880000000,
+    },
+    tiers: [
+      { id: "tier_std", name: "Standard", requests_per_minute: 60, concurrency: 2, free_credits: 250, wallet_cap: 500, default: true, workspaces: 2, created_at: "2026-11-19T10:00:00Z", updated_at: "2026-11-19T10:00:00Z" },
+      { id: "tier_pro", name: "Pro", requests_per_minute: 120, concurrency: 4, free_credits: 500, wallet_cap: null, default: false, workspaces: 0, created_at: "2026-11-19T10:05:00Z", updated_at: "2026-11-19T10:05:00Z" },
+    ],
+    users: {
+      "user-42": workspace("user-42"),
+      "acct:7.eu_west": workspace("acct:7.eu_west", { display_name: "EU account", wallet_used: 480 }),
+    },
+    /** idempotency_key -> the assignment it was used for. */
+    assignments: new Map(),
+    /** Sample usage: the third total has parts that exceed it, which the whole-credit fields must still add up. */
+    usageTotals: { requests: 14, requests_failed: 1, credits_micro: 14000000, credits_wallet_micro: 9000000, credits_own_micro: 3000000 },
+    usageRows: [
+      { day: "2026-11-01", requests: 5, requests_failed: 0, credits_micro: 5000000, credits_wallet_micro: 0, credits_own_micro: 0 },
+      { day: "2026-11-02", requests: 9, requests_failed: 1, credits_micro: 9000000, credits_wallet_micro: 9000000, credits_own_micro: 0 },
+    ],
+    workspaceRows: [
+      { external_user_id: "user-42", workspace_id: "ws_user42", requests: 5, requests_failed: 0, credits_micro: 5000000, credits_wallet_micro: 4000000, credits_own_micro: 3000000 },
+      { external_user_id: "acct:7.eu_west", workspace_id: "ws_accountEUwest", requests: 9, requests_failed: 1, credits_micro: 9000000, credits_wallet_micro: 6000000, credits_own_micro: 0 },
+    ],
+  };
+}
+
+/**
+ * The partner routes, as the API answers them for PARTNER_KEY: { status, body }.
+ * `path` is the raw pathname (ids stay percent-encoded until decoded here).
+ */
+function partnerRoute(s, method, path, query, body) {
+  const problem = (status, code, detail) => ({ status, body: { type: "about:blank", title: code, status, code, detail, retryable: status >= 500 } });
+  const ok = (data, status = 200) => ({ status, body: data });
+  const find = (id) => s.users[id];
+  let m;
+
+  if (method === "GET" && path === "/v1/partner/summary") {
+    return ok({
+      partner: true, org_id: "org_partner", free_credits: 250, workspace_daily_limit: 50, workspace_count: 2,
+      limits: { max_requests_per_minute: 600, max_concurrency: 10, max_free_credits: 1000 },
+      users: { total: 2, active: 2, suspended: 0 }, caps: { committed: 500, uncapped_users: 0 }, balance: s.balance,
+    });
+  }
+  if (method === "GET" && path === "/v1/partner/wallet") return ok(s.balance);
+  if (method === "GET" && path === "/v1/partner/workspaces") return ok({ workspaces: Object.values(s.users) });
+  if (method === "GET" && path === "/v1/partner/usage") {
+    const byWorkspace = query.get("group_by") === "workspace";
+    return ok({
+      period: { start: query.get("from") ?? "2026-10-21", end: query.get("to") ?? "2026-11-20", bounds: "[start, end)", days: 30 },
+      group_by: byWorkspace ? "workspace" : "day",
+      totals: s.usageTotals,
+      rows: byWorkspace ? s.workspaceRows : s.usageRows,
+      page: byWorkspace ? { next_offset: null } : undefined,
+    });
+  }
+  if (method === "GET" && path === "/v1/partner/tiers") return ok({ tiers: s.tiers });
+  if (method === "POST" && path === "/v1/partner/tiers") {
+    if (s.tiers.some((t) => t.name === body.name)) return problem(409, "ERR::REQUEST::CONFLICT", `A tier named ${body.name} already exists.`);
+    const tier = { id: `tier_${s.tiers.length + 1}`, ...body, default: body.default === true, wallet_cap: body.wallet_cap ?? null, workspaces: 0, created_at: "2026-11-20T00:00:00Z", updated_at: "2026-11-20T00:00:00Z" };
+    s.tiers.push(tier);
+    return ok(tier, 201);
+  }
+  if ((m = /^\/v1\/partner\/tiers\/([^/]+)$/.exec(path))) {
+    const id = decodeURIComponent(m[1]);
+    const tier = s.tiers.find((t) => t.id === id);
+    if (!tier) return problem(404, "ERR::REQUEST::NOT_FOUND", "No tier with that id belongs to your account.");
+    if (method === "PATCH") {
+      Object.assign(tier, body, { updated_at: "2026-11-20T00:00:00Z" });
+      return ok(tier);
+    }
+    if (method === "DELETE") {
+      if (tier.workspaces > 0) return problem(409, "ERR::REQUEST::CONFLICT", `${tier.workspaces} workspaces are on this tier. Move them first.`);
+      s.tiers.splice(s.tiers.indexOf(tier), 1);
+      return { status: 204 };
+    }
+  }
+  if ((m = /^\/v1\/partner\/workspaces\/([^/]+)(?:\/(tier|credits|usage|suspend|reactivate))?$/.exec(path))) {
+    const id = decodeURIComponent(m[1]);
+    const u = find(id);
+    if (!u) return problem(404, "ERR::REQUEST::NOT_FOUND", "No workspace with that external_user_id belongs to your account.");
+    const action = m[2];
+    if (!action && method === "GET") return ok(u);
+    if (!action && method === "PATCH") {
+      if (body.display_name !== null && !(typeof body.display_name === "string" && body.display_name.length >= 1 && body.display_name.length <= 100)) {
+        return problem(400, "ERR::REQUEST::INVALID_PARAMETER", "display_name must be 1 to 100 characters, or null.");
+      }
+      u.display_name = body.display_name;
+      return ok(u);
+    }
+    if (action === "suspend" && method === "POST") return ok({ ...u, status: "suspended" });
+    if (action === "reactivate" && method === "POST") return ok({ ...u, status: "active" });
+    if (action === "tier" && method === "PUT") {
+      const tier = s.tiers.find((t) => t.id === body.tier || t.name === body.tier);
+      if (!tier) return problem(404, "ERR::REQUEST::NOT_FOUND", "No tier with that id or name belongs to your account.");
+      u.tier = { id: tier.id, name: tier.name };
+      return ok(u);
+    }
+    if (action === "credits" && method === "POST") {
+      const { credits, idempotency_key: key } = body;
+      const prior = s.assignments.get(key);
+      if (prior) {
+        if (prior.external_user_id === id && prior.credits === credits) {
+          return ok({ external_user_id: id, credits, applied: false, user_credits: u.own_credits, balance_available: s.balance.balance_credits });
+        }
+        return problem(409, "ERR::REQUEST::CONFLICT", "This idempotency_key was already used for a different assignment (another amount or user). Use a new key.");
+      }
+      if (credits > s.balance.balance_credits) {
+        return problem(402, "ERR::LIMIT::QUOTA_EXCEEDED", `You can give at most ${s.balance.balance_credits} credits right now; this assignment is ${credits}.`);
+      }
+      s.balance.balance_credits -= credits;
+      u.own_credits += credits;
+      s.assignments.set(key, { external_user_id: id, credits });
+      return ok({ external_user_id: id, credits, applied: true, user_credits: u.own_credits, balance_available: s.balance.balance_credits });
+    }
+    if (action === "usage" && method === "GET") {
+      return ok({ external_user_id: id, period: { start: query.get("from"), end: query.get("to") }, totals: s.usageTotals, rows: s.usageRows });
+    }
+  }
+  return problem(404, "ERR::NOT_FOUND", `no fake partner route for ${method} ${path}`);
+}
 
 export const INVALID_KEY_PROBLEM = {
   type: "about:blank",
@@ -107,6 +248,10 @@ export const RESULT_LINES = [
 export async function startFakeApi() {
   const api = {
     mode: "up",
+    /** How GET /v1/key answers: "ok", "404" (an older API), "500", or "hang" (never answers). */
+    keyRoute: "ok",
+    /** The partner account behind PARTNER_KEY (see partnerState). */
+    partner: partnerState(),
     /** Every request received: { method, path, auth, body }. */
     requests: [],
     url: "",
@@ -151,6 +296,24 @@ export async function startFakeApi() {
     }
 
     const p = url.pathname;
+    if (req.method === "GET" && p === "/v1/key") {
+      if (api.keyRoute === "404") return problem(404, { title: "Not Found", code: "ERR::NOT_FOUND", detail: "no such route", retryable: false });
+      if (api.keyRoute === "500") return problem(500, { title: "Internal", code: "ERR::INTERNAL::ERROR", detail: "boom", retryable: true });
+      if (api.keyRoute === "hang") return; // never answered: the caller's own timeout ends it
+      return json(200, m[1] === PARTNER_KEY ? KEY_INFO.partner : KEY_INFO.ordinary, { "Cache-Control": "no-store" });
+    }
+    if (p.startsWith("/v1/partner/")) {
+      if (m[1] !== PARTNER_KEY) {
+        return problem(403, { title: "Insufficient scope", code: "ERR::AUTH::INSUFFICIENT_SCOPE", detail: "This key cannot call partner routes.", retryable: false });
+      }
+      const r = partnerRoute(api.partner, req.method, p, url.searchParams, body);
+      if (r.status === 204) {
+        res.writeHead(204).end();
+        return;
+      }
+      if (r.status >= 400) return problem(r.status, { title: r.body.title, code: r.body.code, detail: r.body.detail, retryable: r.body.retryable });
+      return json(r.status, r.body);
+    }
     if (req.method === "GET" && p === "/v1/requests") {
       return json(200, { requests: [], page: { has_more: false, retention_hours: 24 } });
     }

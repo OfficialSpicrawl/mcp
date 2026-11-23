@@ -2,8 +2,8 @@
 
 Instructions for an AI agent (Cline and other MCP clients) setting up Spicrawl for a user.
 Spicrawl reads web pages for you: one URL in, Markdown, HTML, text or JSON out, plus batch jobs,
-screenshots, PDF output and browser sessions. The server defines 25 tools, all named `spicrawl_*`. The hosted endpoint lists 24 until remote browsers
-launch: without a key it leaves out `spicrawl_browser_connect_url` (coming soon).
+screenshots, PDF output and browser sessions. The server defines 27 tools, all named `spicrawl_*`, and lists the same 27 with or without a key. A partner
+key (held by a platform that resells Spicrawl) is offered 18 instead: the partner tools and the docs tools.
 
 ## Before you start
 
@@ -58,8 +58,7 @@ Both options serve the same tools and run under the same key, limits and credits
 
 ## Check that it works
 
-1. The `spicrawl` server should show as connected and list 25 tools (24 without a key, or when
-   `spicrawl_browser_connect_url` is hidden; both are fine). Listing tools works without a key, so a
+1. The `spicrawl` server should show as connected and list 27 tools. Listing tools works without a key, so a
    listed server does not prove the key is right.
 2. Call `spicrawl_usage_summary` (read-only, no arguments). It answers with the account's usage when
    the key is valid.

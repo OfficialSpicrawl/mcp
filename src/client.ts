@@ -143,6 +143,8 @@ export interface ClientConfig {
 export interface RequestOptions {
   /** Called with the response headers before the body is read (a raw scrape's status and credits travel there). */
   onHeaders?: (headers: Headers) => void;
+  /** Overrides the client's timeout for this call (the session's key check asks within 5 s). */
+  timeoutMs?: number;
 }
 
 export class ILayerClient {
@@ -181,7 +183,8 @@ export class ILayerClient {
     options: RequestOptions = {},
   ): Promise<unknown> {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    const timeoutMs = options.timeoutMs ?? this.timeoutMs;
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     let response: Response;
     try {
       response = await fetch(`${this.baseURL}${path}`, {
@@ -198,7 +201,7 @@ export class ILayerClient {
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") {
         throw new Error(
-          `Request to ${path} timed out after ${this.timeoutMs} ms. A render or batch may need a longer timeout, or the API at ${this.baseURL} is unreachable.`,
+          `Request to ${path} timed out after ${timeoutMs} ms. A render or batch may need a longer timeout, or the API at ${this.baseURL} is unreachable.`,
         );
       }
       throw new Error(
