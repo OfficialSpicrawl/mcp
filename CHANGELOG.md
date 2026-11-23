@@ -3,7 +3,7 @@
 All notable changes to `@spicrawl/mcp` are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 0.2.5 — 2026-11-23
 
 - **Changed:** `spicrawl_scrape` with `screenshot: true` turns on `render` itself, instead of failing with ERR::REQUEST::INCOMPATIBLE_FLAGS.
 
