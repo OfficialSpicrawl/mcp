@@ -11,7 +11,8 @@
  * Auth is the caller's own Spicrawl API key, in `Authorization: Bearer spicrawl_live_...`
  * or, for gateways that cannot send a Bearer prefix, a raw `Authorization: spicrawl_live_...`,
  * `x-api-key` or `api-key` (see apiKeyFromRequest; never a query parameter);
- * every tool call runs upstream under that key. One MCP server per session, and
+ * every tool call runs upstream under that key. The tools a session is offered depend on
+ * its key: a partner key gets the partner tools (src/profile.ts). One MCP server per session, and
  * a session is pinned to the key that created it: a request presenting another
  * key with that session id is refused (403), so no caller can run under someone
  * else's key. An initialize is refused (401) unless the API accepts the key,
@@ -50,6 +51,7 @@ import { apiKeyFromRequest, presentsCredentials, readJSON, rpcError } from "./ht
 import { chatgptConfigFromEnv, type ChatgptConfig } from "./chatgpt/oauth.js";
 import { chatgptRoutes } from "./chatgpt/http.js";
 import { buildServerCard } from "./card.js";
+import { keyInfo, toolProfile } from "./profile.js";
 
 const ADDR = process.env.SPICRAWL_MCP_ADDR || "127.0.0.1:8090";
 const BASE_URL = process.env.SPICRAWL_BASE_URL || "http://127.0.0.1:8080";
@@ -238,7 +240,11 @@ async function handleMcp(req: IncomingMessage, res: ServerResponse) {
       : rpcError(res, 503, -32000, check.message, { "Retry-After": "5" });
   }
 
-  const server = buildServer(new ILayerClient({ apiKey: key, baseURL: BASE_URL, publicBaseURL: PUBLIC_BASE_URL }));
+  // Asked once per session. A partner key gets the partner tools and nothing it cannot use.
+  const client = new ILayerClient({ apiKey: key, baseURL: BASE_URL, publicBaseURL: PUBLIC_BASE_URL });
+  const info = await keyInfo(client);
+  if (!info) log("key info unavailable: this session gets the standard tools");
+  const server = buildServer(client, { profile: toolProfile(info) });
   const transport: StreamableHTTPServerTransport = new StreamableHTTPServerTransport({
     sessionIdGenerator: () => randomUUID(),
     onsessioninitialized: (id) => {

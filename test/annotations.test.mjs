@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { after, before, describe, test } from "node:test";
 import { hideUnavailableFromEnv } from "../dist/server.js";
-import { QUOTA_DETAIL, QUOTA_DOC_URL, connectClient, forbiddenIn, startFakeApi, startMcp } from "./helpers/harness.mjs";
+import { PARTNER_KEY, QUOTA_DETAIL, QUOTA_DOC_URL, connectClient, forbiddenIn, startFakeApi, startMcp } from "./helpers/harness.mjs";
 
 // The value of every hint, with the reason. Change a row only with its reason.
 //
@@ -70,6 +70,31 @@ const TOOLS = {
 
 const BROWSER = "spicrawl_browser_connect_url";
 
+// The partner profile (a partner key): the partner tools and the three docs tools. Same
+// columns as TOOLS. Partner tools are confined to the caller's own account (openWorld false).
+const PARTNER_TOOLS = {
+  spicrawl_partner_summary: ["Partner account summary", true, false, false],
+  spicrawl_partner_balance: ["Partner balance", true, false, false],
+  spicrawl_partner_users_list: ["List partner users", true, false, false],
+  spicrawl_partner_user_get: ["Get a partner user", true, false, false],
+  spicrawl_partner_usage: ["Partner usage", true, false, false],
+  spicrawl_partner_user_usage: ["Usage for one partner user", true, false, false],
+  spicrawl_partner_tiers_list: ["List partner tiers", true, false, false],
+  // Creates or changes a record in the partner's own account; nothing is deleted.
+  spicrawl_partner_tier_create: ["Create a partner tier", false, false, false],
+  spicrawl_partner_tier_update: ["Update a partner tier", false, false, false],
+  spicrawl_partner_user_set_tier: ["Move a partner user to a tier", false, false, false],
+  spicrawl_partner_user_update: ["Rename a partner user", false, false, false],
+  spicrawl_partner_user_reactivate: ["Reactivate a partner user", false, false, false],
+  // Moves credits that cannot be taken back through this server.
+  spicrawl_partner_give_credits: ["Give credits to a partner user", false, true, false],
+  // Refused while users are on the tier; the tier's limits are gone for good.
+  spicrawl_partner_tier_delete: ["Delete a partner tier", false, true, false],
+  // Stops a user's key within about a minute; reversible only by reactivating.
+  spicrawl_partner_user_suspend: ["Suspend a partner user", false, true, false],
+};
+for (const name of ["spicrawl_docs_search", "spicrawl_docs_read", "spicrawl_docs_index"]) PARTNER_TOOLS[name] = TOOLS[name];
+
 // Arguments marked "Coming soon" in their description, per tool.
 const COMING_SOON_ARGS = {
   spicrawl_scrape: ["ai_extract", "premium_proxy", "proxy_country", "stealth", "sticky_key", "extract_preset"],
@@ -85,6 +110,8 @@ let hiddenMcp;
 let hiddenClient;
 let tools;
 let hiddenTools;
+let partnerClient;
+let partnerTools;
 
 before(async () => {
   api = await startFakeApi();
@@ -92,13 +119,16 @@ before(async () => {
   hiddenMcp = await startMcp(api.url, { SPICRAWL_MCP_HIDE_UNAVAILABLE: "1" });
   ({ client } = await connectClient(mcp.mcpURL));
   ({ client: hiddenClient } = await connectClient(hiddenMcp.mcpURL));
+  ({ client: partnerClient } = await connectClient(mcp.mcpURL, PARTNER_KEY));
   tools = (await client.listTools()).tools;
   hiddenTools = (await hiddenClient.listTools()).tools;
+  partnerTools = (await partnerClient.listTools()).tools;
 });
 
 after(async () => {
   await client?.close().catch(() => {});
   await hiddenClient?.close().catch(() => {});
+  await partnerClient?.close().catch(() => {});
   await mcp?.stop();
   await hiddenMcp?.stop();
   await api?.close();
@@ -288,5 +318,41 @@ describe("SPICRAWL_MCP_HIDE_UNAVAILABLE=1", () => {
     assert.equal(sent[0].body.js_render, true);
     assert.equal(sent[0].body.ai_extract, undefined);
     assert.equal(sent[0].body.premium_proxy, undefined);
+  });
+});
+
+describe("partner profile tool annotations", () => {
+  test("a partner key is offered exactly the partner tools and the three docs tools", () => {
+    assert.equal(Object.keys(PARTNER_TOOLS).length, 18);
+    assert.deepEqual(partnerTools.map((t) => t.name).sort(), Object.keys(PARTNER_TOOLS).sort());
+  });
+
+  test("every partner tool has a title and the three hints as explicit booleans", () => {
+    for (const t of partnerTools) {
+      assert.ok(t.title.trim().length >= 3 && t.title !== t.name, `${t.name}: title ${JSON.stringify(t.title)}`);
+      for (const hint of ["readOnlyHint", "destructiveHint", "openWorldHint"]) {
+        assert.equal(typeof t.annotations?.[hint], "boolean", `${t.name}: ${hint} is not an explicit boolean`);
+      }
+    }
+  });
+
+  test("each partner tool's title and hints are the ones in the table", () => {
+    const wrong = [];
+    for (const t of partnerTools) {
+      if (JSON.stringify(hints(t)) !== JSON.stringify(PARTNER_TOOLS[t.name])) {
+        wrong.push(`${t.name}: got ${JSON.stringify(hints(t))}, want ${JSON.stringify(PARTNER_TOOLS[t.name])}`);
+      }
+    }
+    assert.deepEqual(wrong, []);
+  });
+
+  test("the destructive partner tools are the ones that move credits, delete a tier or suspend a user", () => {
+    const destructive = partnerTools.filter((t) => t.annotations.destructiveHint).map((t) => t.name).sort();
+    assert.deepEqual(destructive, ["spicrawl_partner_give_credits", "spicrawl_partner_tier_delete", "spicrawl_partner_user_suspend"]);
+  });
+
+  test("the standard listing keeps exactly its 27 tools, and no partner tool is in it", () => {
+    assert.equal(tools.length, 27);
+    assert.deepEqual(tools.filter((t) => t.name.startsWith("spicrawl_partner_")), []);
   });
 });

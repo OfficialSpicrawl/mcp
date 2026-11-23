@@ -42,7 +42,7 @@ To let Claude, Cursor or another AI agent scrape websites, connect the Spicrawl 
 
 4. Ask your agent: *"Use Spicrawl to read https://example.com/pricing as markdown and list each plan with its price."* It calls `spicrawl_scrape` and gets the page back as Markdown.
 
-Both transports serve the same 27 `spicrawl_*` tools (see [Tools](#tools)), and every call runs under your key with the same scopes, limits and credits as a direct API call.
+Both transports serve the same 27 `spicrawl_*` tools (see [Tools](#tools)), and every call runs under your key with the same scopes, limits and credits as a direct API call. A partner key, which a platform that resells Spicrawl holds, is offered the [partner tools](#partner-tools) instead.
 
 ## What it does
 
@@ -77,7 +77,7 @@ Check each site's terms and `robots.txt` before you scrape it.
 
 ## Tools
 
-27 tools, grouped by task. Tools reject unknown arguments, so a misspelt field fails with an error naming it instead of being silently dropped. Every tool sets a `title` and explicit `readOnlyHint`, `destructiveHint` and `openWorldHint` annotations, so a client knows which calls to confirm: `spicrawl_scrape` is not read-only (its `method` and `actions` can submit forms), and `spicrawl_batch_cancel`, `spicrawl_session_release` and `spicrawl_session_delete` are destructive. Every tool also declares an `outputSchema` and returns matching `structuredContent` beside the same text it always returned, so a client can read fields (`credits`, `status`, `next_cursor`, ...) without parsing text. The schemas list what an agent can rely on and stay open: fields the API adds later pass through, and statuses and tiers are plain strings. A tool that returns a document or a JSON array (`spicrawl_docs_read`, `spicrawl_batch_task_content`) puts it under `content` in `structuredContent`. Full argument reference: [docs.spicrawl.com/agents/mcp](https://docs.spicrawl.com/agents/mcp#tools).
+27 tools, grouped by task. A partner key is offered the [partner tools](#partner-tools) and the docs tools instead. Tools reject unknown arguments, so a misspelt field fails with an error naming it instead of being silently dropped. Every tool sets a `title` and explicit `readOnlyHint`, `destructiveHint` and `openWorldHint` annotations, so a client knows which calls to confirm: `spicrawl_scrape` is not read-only (its `method` and `actions` can submit forms), and `spicrawl_batch_cancel`, `spicrawl_session_release` and `spicrawl_session_delete` are destructive. Every tool also declares an `outputSchema` and returns matching `structuredContent` beside the same text it always returned, so a client can read fields (`credits`, `status`, `next_cursor`, ...) without parsing text. The schemas list what an agent can rely on and stay open: fields the API adds later pass through, and statuses and tiers are plain strings. A tool that returns a document or a JSON array (`spicrawl_docs_read`, `spicrawl_batch_task_content`) puts it under `content` in `structuredContent`. Full argument reference: [docs.spicrawl.com/agents/mcp](https://docs.spicrawl.com/agents/mcp#tools).
 
 ### Scrape a website to Markdown
 
@@ -141,6 +141,38 @@ While a person has control, the agent's input and navigation commands fail with 
 ### Coming soon
 
 The schemas accept `ai_extract`, `stealth`, `extract_preset`, `premium_proxy`, `proxy_country` and `sticky_key` ahead of launch. Agents should not send them yet. To list only what works today, set `SPICRAWL_MCP_HIDE_UNAVAILABLE=1` (see [Environment variables](https://github.com/OfficialSpicrawl/mcp#environment-variables)).
+
+### Partner tools
+
+For a platform that resells Spicrawl to its own users. A partner has one workspace per user, one balance of credits shared by all of them, and tiers: named sets of limits given to any number of users. These tools run that account. They are offered only to a partner key (a key with the `partner` scope; it cannot scrape). A partner key is offered these 15 tools and the three docs tools, 18 in all, and no scrape, batch, session or browser tool. Any other key gets the 27 standard tools. The partner tools are not in the keyless tool list or the server card.
+
+**Creating a user is not available here.** The call that creates a user's workspace returns that user's API key in plain text, and that key must not pass through an assistant's transcript. Create users from your own server with `PUT /v1/partner/workspaces/{external_user_id}`, as the [partner API reference](https://docs.spicrawl.com/agents/mcp) describes.
+
+Terms used below. The **cap** is the most credits per month a user may take from the balance. **Credits given** are credits moved from the balance to one user; they do not reset and are spent before the balance. A user's requests spend free monthly credits first, then credits given, then the balance up to the cap.
+
+| Tool | What it does | Read-only | Destructive |
+|---|---|---|---|
+| `spicrawl_partner_summary` | Users, limits, caps and balance in one call. | yes | no |
+| `spicrawl_partner_balance` | The balance: credits you can give, and what users spent. | yes | no |
+| `spicrawl_partner_users_list` | A page of users, searchable by id prefix, or sorted by balance use. | yes | no |
+| `spicrawl_partner_user_get` | One user's status, tier, cap, usage this month and credits given. | yes | no |
+| `spicrawl_partner_usage` | Usage for all users, per day or per user, with whole-credit parts. | yes | no |
+| `spicrawl_partner_user_usage` | One user's usage per day. | yes | no |
+| `spicrawl_partner_tiers_list` | Your tiers and how many users are on each. | yes | no |
+| `spicrawl_partner_tier_create` | Create a tier. | no | no |
+| `spicrawl_partner_tier_update` | Change a tier's limits, cap or default. | no | no |
+| `spicrawl_partner_user_set_tier` | Move a user to another tier. | no | no |
+| `spicrawl_partner_user_update` | Set or clear a user's label. | no | no |
+| `spicrawl_partner_user_reactivate` | Reactivate a user you suspended. | no | no |
+| `spicrawl_partner_give_credits` | Move credits from the balance to one user. Cannot be undone here. | no | yes |
+| `spicrawl_partner_tier_delete` | Delete a tier that no user is on. | no | yes |
+| `spicrawl_partner_user_suspend` | Stop a user's key within about a minute. | no | yes |
+
+Usage tools return the API's micro-credit fields (`credits_micro`, millionths of a credit) and add whole-credit fields that add up: `credits` = `credits_from_balance` + `credits_given_spent` + `credits_free`.
+
+`spicrawl_partner_give_credits` takes an optional `idempotency_key`. Without one the server generates a key and returns it, so keep it if the call may need a retry: the same key, user and amount moves nothing and reports `applied: false`.
+
+Example flow: *"Show my balance and the five users closest to their cap; give user-42 500 credits."* The assistant calls `spicrawl_partner_balance`, then `spicrawl_partner_users_list` with `sort` set to `wallet_used` and reads the first five against each `wallet_cap`. It then asks you to confirm the 500 credits for user-42 and, once you do, calls `spicrawl_partner_give_credits`.
 
 ## Example prompts
 

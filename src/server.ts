@@ -3,7 +3,9 @@ import { McpServer, type RegisteredTool, type ToolCallback } from "@modelcontext
 import type { AnySchema, ZodRawShapeCompat } from "@modelcontextprotocol/sdk/server/zod-compat.js";
 import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import { ILayerClient, PACKAGE_VERSION } from "./client.js";
-import type { ToolOptions } from "./tools/common.js";
+import type { RegisterTools, ToolOptions } from "./tools/common.js";
+import type { ToolProfile } from "./profile.js";
+import { registerPartnerTools } from "./tools/partner.js";
 import { registerScrapeTools } from "./tools/scrape.js";
 import { registerBatchTools } from "./tools/batch.js";
 import { registerSessionsTools } from "./tools/sessions.js";
@@ -182,6 +184,11 @@ export interface ServerOptions {
    * Default: SPICRAWL_MCP_HIDE_UNAVAILABLE.
    */
   hideUnavailable?: boolean;
+  /**
+   * Which tools to register. `standard` (the default) is the public set. `partner`
+   * (a partner key, see src/profile.ts) is the partner tools and the docs tools.
+   */
+  profile?: ToolProfile;
 }
 
 /**
@@ -191,16 +198,18 @@ export interface ServerOptions {
 export function buildServer(client: ILayerClient, options: ServerOptions = {}): McpServer {
   const toolOptions: ToolOptions = { hideUnavailable: options.hideUnavailable ?? hideUnavailableFromEnv() };
   const server = new SpicrawlMcpServer({ name: SERVER_NAME, version: SERVER_VERSION });
-  for (const register of [
-    registerScrapeTools,
-    registerBatchTools,
-    registerSessionsTools,
-    registerUsageTools,
-    registerRequestsTools,
-    registerBrowserTools,
-    registerDocsTools,
-  ]) {
-    register(server, client, toolOptions);
-  }
+  const registers: RegisterTools[] =
+    options.profile === "partner"
+      ? [registerPartnerTools, registerDocsTools]
+      : [
+          registerScrapeTools,
+          registerBatchTools,
+          registerSessionsTools,
+          registerUsageTools,
+          registerRequestsTools,
+          registerBrowserTools,
+          registerDocsTools,
+        ];
+  for (const register of registers) register(server, client, toolOptions);
   return server;
 }

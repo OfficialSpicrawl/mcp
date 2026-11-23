@@ -146,7 +146,8 @@ describe("API key forms", () => {
     const before = api.requests.length;
     const out = await rawPost(url, { key, headers, body });
     seen.push(out.text);
-    return { ...out, upstream: api.requests.slice(before) };
+    // The session's GET /v1/key (the tool-profile check) is not part of the key check these tests pin.
+    return { ...out, upstream: api.requests.slice(before).filter((r) => r.path !== "/v1/key") };
   }
 
   const FORMS = {
