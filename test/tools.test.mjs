@@ -199,6 +199,16 @@ describe("argument validation", () => {
     assert.equal(sent[0].body.js_render, true);
   });
 
+  test("screenshot without render still reaches the API with js_render on", async () => {
+    const beforeCount = scrapeRequests().length;
+    const res = await call("spicrawl_scrape", { url: "https://example.com", screenshot: true });
+    assert.equal(res.rpcError, undefined, `unexpected JSON-RPC error: ${res.rpcError?.message}`);
+    const sent = scrapeRequests().slice(beforeCount);
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].body.screenshot, true);
+    assert.equal(sent[0].body.js_render, true);
+  });
+
   test("tools/list: every tool's inputSchema forbids additional properties", async () => {
     const { tools } = await client.listTools();
     assert.ok(tools.length >= 22, `expected at least 22 tools, got ${tools.length}`);

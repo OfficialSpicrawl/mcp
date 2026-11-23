@@ -63,7 +63,7 @@ const ScrapeInput = {
       COMING_SOON +
         "Model-driven extraction: describe what you want and let a model find it, no selectors. Refused with ERR::INTERNAL::UNAVAILABLE until it launches; use `extract` or `autoparse`.",
     ),
-  screenshot: z.boolean().default(false).describe("Capture a screenshot (requires render)."),
+  screenshot: z.boolean().default(false).describe("Capture a screenshot. Turns on `render`, since a screenshot needs a browser."),
   impersonate: z
     .boolean()
     .optional()
@@ -246,7 +246,8 @@ server.registerTool(
   },
   async (input) => {
     const params: Record<string, unknown> = { url: input.url, response_format: input.format };
-    if (input.render) params.js_render = true;
+    // A screenshot needs a browser, so it turns rendering on rather than failing with INCOMPATIBLE_FLAGS.
+    if (input.render || input.screenshot) params.js_render = true;
     if (input.main_content_only !== undefined) params.main_content_only = input.main_content_only;
     if (input.include_tags?.length) params.include_tags = input.include_tags;
     if (input.exclude_tags?.length) params.exclude_tags = input.exclude_tags;

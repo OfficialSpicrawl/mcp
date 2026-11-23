@@ -3,6 +3,10 @@
 All notable changes to `@spicrawl/mcp` are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.2.5 — 2026-11-23
+
+- **Changed:** `spicrawl_scrape` with `screenshot: true` turns on `render` itself, instead of failing with ERR::REQUEST::INCOMPATIBLE_FLAGS.
+
 ## 0.2.4 — 2026-11-19
 
 - **Changed:** `spicrawl_batch_submit` (and the ChatGPT endpoint's batch tool) take `format` `markdown`, `text` or `html` only, and an item's `response_format` takes the same three. Batch no longer returns the JSON envelope; `spicrawl_scrape` still does.
