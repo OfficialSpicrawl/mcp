@@ -66,7 +66,7 @@ function keywords(schema, path = "", out = []) {
 
 describe("every tool declares an outputSchema", () => {
   test("all tools", () => {
-    assert.equal(tools.length, 27);
+    assert.equal(tools.length, 28);
     const missing = tools.filter((t) => !t.outputSchema).map((t) => t.name);
     assert.deepEqual(missing, []);
     for (const t of tools) {

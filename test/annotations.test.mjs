@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { after, before, describe, test } from "node:test";
 import { hideUnavailableFromEnv } from "../dist/server.js";
-import { PARTNER_KEY, QUOTA_DETAIL, QUOTA_DOC_URL, connectClient, forbiddenIn, startFakeApi, startMcp } from "./helpers/harness.mjs";
+import { PARTNER_KEY, SCOPED_KEY, QUOTA_DETAIL, QUOTA_DOC_URL, connectClient, forbiddenIn, startFakeApi, startMcp } from "./helpers/harness.mjs";
 
 // The value of every hint, with the reason. Change a row only with its reason.
 //
@@ -22,6 +22,9 @@ const TOOLS = {
   // `method` accepts POST/PUT/PATCH/DELETE and `actions` click, fill and run scripts, so a call can
   // submit a form on a third-party site: not read-only. A plain call is additive: not destructive.
   spicrawl_scrape: ["Scrape a URL", false, false, true],
+
+  // Renders one public page and returns its brand links and values; creates nothing, but bills each call.
+  spicrawl_brand: ["Extract a site's brand", true, false, true],
 
   // Queues work that fetches arbitrary public URLs.
   spicrawl_batch_submit: ["Submit a batch scrape job", false, false, true],
@@ -70,6 +73,31 @@ const TOOLS = {
 
 const BROWSER = "spicrawl_browser_connect_url";
 
+// Offered only to a key with the `webhooks` / `monitors` scope. Same columns as TOOLS.
+// Both groups act on the caller's own account, except a ping or a check, which fetches or posts
+// to a third-party URL (open world). A delete is irreversible, so destructive. A rotation is
+// declared a plain write: the old secret stops verifying, but the endpoint and its history stay.
+const WEBHOOK_TOOLS = {
+  spicrawl_webhooks_list: ["List webhook endpoints", true, false, false],
+  spicrawl_webhook_get: ["Get a webhook endpoint", true, false, false],
+  spicrawl_webhook_create: ["Create a webhook endpoint", false, false, false],
+  spicrawl_webhook_update: ["Update a webhook endpoint", false, false, false],
+  spicrawl_webhook_delete: ["Delete a webhook endpoint", false, true, false],
+  spicrawl_webhook_test: ["Send a test ping", false, false, true],
+  spicrawl_webhook_rotate_secret: ["Rotate a webhook secret", false, false, false],
+  spicrawl_webhook_deliveries: ["Recent webhook deliveries", true, false, false],
+};
+const MONITOR_TOOLS = {
+  spicrawl_monitors_list: ["List monitors", true, false, false],
+  spicrawl_monitor_get: ["Get a monitor", true, false, false],
+  spicrawl_monitor_create: ["Create a monitor", false, false, false],
+  spicrawl_monitor_update: ["Update a monitor", false, false, false],
+  spicrawl_monitor_delete: ["Delete a monitor", false, true, false],
+  spicrawl_monitor_check: ["Check a monitor now", false, false, true],
+  spicrawl_monitor_changes: ["Monitor change history", true, false, false],
+  spicrawl_monitor_pages: ["Pages of a site monitor", true, false, false],
+};
+
 // The partner profile (a partner key): the partner tools and the three docs tools. Same
 // columns as TOOLS. Partner tools are confined to the caller's own account (openWorld false).
 const PARTNER_TOOLS = {
@@ -112,6 +140,7 @@ let tools;
 let hiddenTools;
 let partnerClient;
 let partnerTools;
+let scopedTools;
 
 before(async () => {
   api = await startFakeApi();
@@ -123,6 +152,9 @@ before(async () => {
   tools = (await client.listTools()).tools;
   hiddenTools = (await hiddenClient.listTools()).tools;
   partnerTools = (await partnerClient.listTools()).tools;
+  const { client: scopedClient } = await connectClient(mcp.mcpURL, SCOPED_KEY);
+  scopedTools = (await scopedClient.listTools()).tools;
+  await scopedClient.close().catch(() => {});
 });
 
 after(async () => {
@@ -148,8 +180,8 @@ function descriptions(schema, out = []) {
 const hints = (t) => [t.title, t.annotations.readOnlyHint, t.annotations.destructiveHint, t.annotations.openWorldHint];
 
 describe("tool annotations and titles", () => {
-  test("the table lists exactly the 27 registered tools", () => {
-    assert.equal(Object.keys(TOOLS).length, 27);
+  test("the table lists exactly the 28 registered tools", () => {
+    assert.equal(Object.keys(TOOLS).length, 28);
     assert.deepEqual(tools.map((t) => t.name).sort(), Object.keys(TOOLS).sort());
   });
 
@@ -351,8 +383,43 @@ describe("partner profile tool annotations", () => {
     assert.deepEqual(destructive, ["spicrawl_partner_give_credits", "spicrawl_partner_tier_delete", "spicrawl_partner_user_suspend"]);
   });
 
-  test("the standard listing keeps exactly its 27 tools, and no partner tool is in it", () => {
-    assert.equal(tools.length, 27);
+  test("the standard listing keeps exactly its 28 tools, and no partner tool is in it", () => {
+    assert.equal(tools.length, 28);
     assert.deepEqual(tools.filter((t) => t.name.startsWith("spicrawl_partner_")), []);
+  });
+});
+
+describe("webhook and monitor tool annotations (key with both scopes)", () => {
+  const SCOPED = { ...WEBHOOK_TOOLS, ...MONITOR_TOOLS };
+  const scoped = () => scopedTools.filter((t) => t.name in SCOPED);
+
+  test("a key with both scopes is offered the 28 standard tools plus every webhook and monitor tool", () => {
+    assert.equal(scopedTools.length, 28 + Object.keys(SCOPED).length);
+    assert.deepEqual(scoped().map((t) => t.name).sort(), Object.keys(SCOPED).sort());
+  });
+
+  test("each title and the three hints are the ones in the table", () => {
+    const wrong = [];
+    for (const t of scoped()) {
+      if (JSON.stringify(hints(t)) !== JSON.stringify(SCOPED[t.name])) wrong.push(`${t.name}: got ${JSON.stringify(hints(t))}, want ${JSON.stringify(SCOPED[t.name])}`);
+    }
+    assert.deepEqual(wrong, []);
+  });
+
+  test("idempotentHint: reads and updates are idempotent; creates, tests, checks and rotations are not", () => {
+    const idem = Object.fromEntries(scoped().map((t) => [t.name, t.annotations.idempotentHint]));
+    const yes = ["spicrawl_webhooks_list", "spicrawl_webhook_get", "spicrawl_webhook_update", "spicrawl_webhook_deliveries", "spicrawl_monitors_list", "spicrawl_monitor_get", "spicrawl_monitor_update", "spicrawl_monitor_changes", "spicrawl_monitor_pages"];
+    for (const name of Object.keys(SCOPED)) assert.equal(idem[name], yes.includes(name), name);
+  });
+
+  test("the destructive scoped tools are the two deletes", () => {
+    assert.deepEqual(scoped().filter((t) => t.annotations.destructiveHint).map((t) => t.name).sort(), ["spicrawl_monitor_delete", "spicrawl_webhook_delete"]);
+  });
+
+  test("every scoped tool has an outputSchema and no description names internal tooling", () => {
+    for (const t of scoped()) {
+      assert.ok(t.outputSchema, `${t.name}: no outputSchema`);
+      assert.deepEqual(forbiddenIn([t.description, t.inputSchema]), [], t.name);
+    }
   });
 });

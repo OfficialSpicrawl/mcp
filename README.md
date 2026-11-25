@@ -42,7 +42,7 @@ To let Claude, Cursor or another AI agent scrape websites, connect the Spicrawl 
 
 4. Ask your agent: *"Use Spicrawl to read https://example.com/pricing as markdown and list each plan with its price."* It calls `spicrawl_scrape` and gets the page back as Markdown.
 
-Both transports serve the same 27 `spicrawl_*` tools (see [Tools](#tools)), and every call runs under your key with the same scopes, limits and credits as a direct API call. A partner key, which a platform that resells Spicrawl holds, is offered the [partner tools](#partner-tools) instead.
+Both transports serve the same `spicrawl_*` tools (see [Tools](#tools)): 28 with a standard key, and 16 more with the `webhooks` and `monitors` scopes. Every call runs under your key with the same scopes, limits and credits as a direct API call. A partner key, which a platform that resells Spicrawl holds, is offered the [partner tools](#partner-tools) instead.
 
 ## What it does
 
@@ -53,6 +53,7 @@ Both transports serve the same 27 `spicrawl_*` tools (see [Tools](#tools)), and 
 - **Return screenshots and PDFs the model can see**: screenshots arrive as MCP image blocks (up to 5 MB of base64 each) and printed pages as `application/pdf` resource blocks (up to 10 MB).
 - **Batch scrape thousands of URLs** as one async job, up to 10,000 items per call, with 9 tools to submit, poll, page through results, retry, cancel and keep a job open so you can append URLs as you discover them.
 - **Keep a logged-in browser** with persistent sessions: cookies, storage and a fixed rendering tier reused across scrapes.
+- **Read a company's brand** (logos, colours, fonts, socials, hero tagline) from one rendered page with `spicrawl_brand`, and **watch pages for changes** with monitors that notify a signed webhook.
 - **Answer "what did that cost?"** from usage and request-log tools, and **read the Spicrawl docs** from inside the agent.
 
 ## Use cases
@@ -77,13 +78,19 @@ Check each site's terms and `robots.txt` before you scrape it.
 
 ## Tools
 
-27 tools, grouped by task. A partner key is offered the [partner tools](#partner-tools) and the docs tools instead. Tools reject unknown arguments, so a misspelt field fails with an error naming it instead of being silently dropped. Every tool sets a `title` and explicit `readOnlyHint`, `destructiveHint` and `openWorldHint` annotations, so a client knows which calls to confirm: `spicrawl_scrape` is not read-only (its `method` and `actions` can submit forms), and `spicrawl_batch_cancel`, `spicrawl_session_release` and `spicrawl_session_delete` are destructive. Every tool also declares an `outputSchema` and returns matching `structuredContent` beside the same text it always returned, so a client can read fields (`credits`, `status`, `next_cursor`, ...) without parsing text. The schemas list what an agent can rely on and stay open: fields the API adds later pass through, and statuses and tiers are plain strings. A tool that returns a document or a JSON array (`spicrawl_docs_read`, `spicrawl_batch_task_content`) puts it under `content` in `structuredContent`. Full argument reference: [docs.spicrawl.com/agents/mcp](https://docs.spicrawl.com/agents/mcp#tools).
+28 tools, grouped by task. A key with the `webhooks` scope is also offered the [webhook tools](#webhooks), and a key with the `monitors` scope the [monitor tools](#monitors). A partner key is offered the [partner tools](#partner-tools) and the docs tools instead. Tools reject unknown arguments, so a misspelt field fails with an error naming it instead of being silently dropped. Every tool sets a `title` and explicit `readOnlyHint`, `destructiveHint` and `openWorldHint` annotations, so a client knows which calls to confirm: `spicrawl_scrape` is not read-only (its `method` and `actions` can submit forms), and `spicrawl_batch_cancel`, `spicrawl_session_release` and `spicrawl_session_delete` are destructive. Every tool also declares an `outputSchema` and returns matching `structuredContent` beside the same text it always returned, so a client can read fields (`credits`, `status`, `next_cursor`, ...) without parsing text. The schemas list what an agent can rely on and stay open: fields the API adds later pass through, and statuses and tiers are plain strings. A tool that returns a document or a JSON array (`spicrawl_docs_read`, `spicrawl_batch_task_content`) puts it under `content` in `structuredContent`. Full argument reference: [docs.spicrawl.com/agents/mcp](https://docs.spicrawl.com/agents/mcp#tools).
 
 ### Scrape a website to Markdown
 
 | Tool | What it does | Key parameters |
 |---|---|---|
 | `spicrawl_scrape` | Retrieve one URL as `markdown` (default), `text`, `html`, `json` or `pdf`, with optional rendering, extraction, links, screenshots and browser actions. | `url`, `format`, `render`, `mode`, `main_content_only`, `include_tags`, `exclude_tags`, `extract`, `autoparse`, `links`, `screenshot`, `actions`, `wait_for`, `scroll_pages`, `session_id`, `proxy`, `cache`, `max_cost` |
+
+### Brand
+
+| Tool | What it does | Key parameters |
+|---|---|---|
+| `spicrawl_brand` | A site's identity, logo links, icons, colours, fonts, images, video links and socials from one rendered page. Links only; nothing is downloaded. Billed like a JavaScript-rendered scrape (3 credits typically). | `url`, `include` |
 
 ### Batch scrape many URLs
 
@@ -138,13 +145,45 @@ While a person has control, the agent's input and navigation commands fail with 
 | `spicrawl_docs_read` | Read one docs page as Markdown (truncated over 60,000 characters). | `path` |
 | `spicrawl_docs_index` | The docs' `llms.txt`: every page with its title and `.md` link. | none |
 
+### Webhooks
+
+Offered to a key with the `webhooks` scope. A webhook endpoint is an HTTPS URL that receives signed notifications for batch jobs and monitors. Each organization may hold 20.
+
+| Tool | What it does | Key parameters | Destructive |
+|---|---|---|---|
+| `spicrawl_webhooks_list` | Every endpoint, with its health. The secret is never listed. | none | no |
+| `spicrawl_webhook_get` | One endpoint's status, failure counts and whether it is enabled. | `webhook_id` | no |
+| `spicrawl_webhook_create` | Register an endpoint. Returns the signing secret once; store it. | `url`, `name`, `events`, `format` | no |
+| `spicrawl_webhook_update` | Change the URL, name, events or format, or enable or disable. | `webhook_id` and the fields to change | no |
+| `spicrawl_webhook_delete` | Delete an endpoint and its delivery history. | `webhook_id` | yes |
+| `spicrawl_webhook_test` | Send a signed `ping` to check the receiver. | `webhook_id` | no |
+| `spicrawl_webhook_rotate_secret` | Issue a new signing secret; the old one stops verifying. Returned once. | `webhook_id` | no |
+| `spicrawl_webhook_deliveries` | Recent deliveries with status, attempts and the last error. | `webhook_id`, `limit` | no |
+
+### Monitors
+
+Offered to a key with the `monitors` scope. A monitor watches one page (`scope` `page`) or every page on a site's exact host (`scope` `site`, with `max_pages`) and reports a change once it is confirmed. Each check bills like the scrape that fetched it.
+
+| Tool | What it does | Key parameters | Destructive |
+|---|---|---|---|
+| `spicrawl_monitors_list` | Every monitor, with its schedule and whether it is enabled. | none | no |
+| `spicrawl_monitor_get` | One monitor's schedule, failures and last run. | `monitor_id` | no |
+| `spicrawl_monitor_create` | Start watching a page or a site. The first check is a baseline and reports nothing. | `url`, `scope`, `max_pages`, `selector`, `interval_seconds`, `confirm_checks`, `js_render`, `webhook_endpoint_id` | no |
+| `spicrawl_monitor_update` | Change the interval, selector, endpoint or limits, or re-enable a disabled monitor. `scope` cannot change. | `monitor_id` and the fields to change | no |
+| `spicrawl_monitor_delete` | Delete a monitor and its change history. | `monitor_id` | yes |
+| `spicrawl_monitor_check` | Check now, fetching the page fresh. Spends credits. | `monitor_id` | no |
+| `spicrawl_monitor_changes` | Confirmed changes, newest first, with diffs (or a digest for a site run). | `monitor_id`, `limit` | no |
+| `spicrawl_monitor_pages` | The pages a site monitor tracks. | `monitor_id`, `limit`, `cursor` | no |
+
+The webhook and monitor tools are not in the keyless tool list or the server card, because they depend on the key's scopes.
+
 ### Coming soon
 
 The schemas accept `ai_extract`, `stealth`, `extract_preset`, `premium_proxy`, `proxy_country` and `sticky_key` ahead of launch. Agents should not send them yet. To list only what works today, set `SPICRAWL_MCP_HIDE_UNAVAILABLE=1` (see [Environment variables](https://github.com/OfficialSpicrawl/mcp#environment-variables)).
 
 ### Partner tools
 
-For a platform that resells Spicrawl to its own users. A partner has one workspace per user, one balance of credits shared by all of them, and tiers: named sets of limits given to any number of users. These tools run that account. They are offered only to a partner key (a key with the `partner` scope; it cannot scrape). A partner key is offered these 15 tools and the three docs tools, 18 in all, and no scrape, batch, session or browser tool. Any other key gets the 27 standard tools. The partner tools are not in the keyless tool list or the server card.
+For a platform that resells Spicrawl to its own users. A partner has one workspace per user, one balance of credits shared by all of them, and tiers: named sets of limits given to any number of users. These tools run that account. They are offered only to a partner key (a key with the `partner` scope; it cannot scrape). A partner key is offered these 15 tools and the three docs tools, 18 in all, and no scrape, batch, session or browser tool. Any other key gets the 28 standard tools, plus the webhook tools with a `webhooks` scope and the monitor tools with a `monitors` scope. The partner tools are not in the keyless tool list or the server card.
 
 **Creating a user is not available here.** The call that creates a user's workspace returns that user's API key in plain text, and that key must not pass through an assistant's transcript. Create users from your own server with `PUT /v1/partner/workspaces/{external_user_id}`, as the [partner API reference](https://docs.spicrawl.com/agents/mcp) describes.
 

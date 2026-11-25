@@ -19,13 +19,32 @@ export const UNKNOWN_KEY = `spicrawl_live_${"z".repeat(52)}`;
 /** A partner key: the partner scope and read, and no scrape. Its session gets the partner tools. */
 export const PARTNER_KEY = `spicrawl_live_${"c".repeat(52)}`;
 
-const VALID_KEYS = new Set([VALID_KEY, OTHER_VALID_KEY, PARTNER_KEY]);
+/** An ordinary key that also holds the webhooks and monitors scopes. */
+export const SCOPED_KEY = `spicrawl_live_${"d".repeat(52)}`;
+/** Ordinary keys holding exactly one of the two scopes. */
+export const WEBHOOKS_KEY = `spicrawl_live_${"e".repeat(52)}`;
+export const MONITORS_KEY = `spicrawl_live_${"f".repeat(52)}`;
+
+const VALID_KEYS = new Set([VALID_KEY, OTHER_VALID_KEY, PARTNER_KEY, SCOPED_KEY, WEBHOOKS_KEY, MONITORS_KEY]);
 
 /** What GET /v1/key answers for each kind of key. */
 const KEY_INFO = {
   ordinary: { key_id: "01KEYORD", name: "Default", prefix: "spicrawl_live_aaaa", scopes: ["scrape", "batch", "sessions"], environment: "live", organization: { id: "org_1", name: "Acme" }, partner: false, workspace_of_partner: false, created_at: "2026-11-18T09:00:00Z", expires_at: null },
   partner: { key_id: "01KEYPART", name: "Partner", prefix: "spicrawl_live_cccc", scopes: ["partner", "read"], environment: "live", organization: { id: "org_partner", name: "Partner Co" }, partner: true, workspace_of_partner: false, created_at: "2026-11-18T09:00:00Z", expires_at: null },
 };
+
+const withScopes = (...extra) => ({ ...KEY_INFO.ordinary, scopes: [...KEY_INFO.ordinary.scopes, ...extra] });
+const KEY_INFO_BY_KEY = {
+  [PARTNER_KEY]: KEY_INFO.partner,
+  [SCOPED_KEY]: withScopes("webhooks", "monitors"),
+  [WEBHOOKS_KEY]: withScopes("webhooks"),
+  [MONITORS_KEY]: withScopes("monitors"),
+};
+
+/** Webhook, monitor and brand records as the API shapes them. */
+export const WEBHOOK = { id: "wh_1", name: "ops", url: "https://example.com/hook", events: ["monitor.changed"], format: "json", enabled: true, consecutive_failures: 0, secret_version: 1 };
+export const WEBHOOK_SECRET = "whsec_" + "s".repeat(32);
+export const MONITOR = { id: "mon_1", url: "https://example.com/", scope: "page", interval_seconds: 3600, enabled: true, webhook_endpoint_id: "wh_1" };
 
 const WORKSPACE_BASE = {
   display_name: null, status: "active", created_at: "2026-11-18T09:00:00Z", free_credits: 250, free_used: 40,
@@ -300,7 +319,7 @@ export async function startFakeApi() {
       if (api.keyRoute === "404") return problem(404, { title: "Not Found", code: "ERR::NOT_FOUND", detail: "no such route", retryable: false });
       if (api.keyRoute === "500") return problem(500, { title: "Internal", code: "ERR::INTERNAL::ERROR", detail: "boom", retryable: true });
       if (api.keyRoute === "hang") return; // never answered: the caller's own timeout ends it
-      return json(200, m[1] === PARTNER_KEY ? KEY_INFO.partner : KEY_INFO.ordinary, { "Cache-Control": "no-store" });
+      return json(200, KEY_INFO_BY_KEY[m[1]] ?? KEY_INFO.ordinary, { "Cache-Control": "no-store" });
     }
     if (p.startsWith("/v1/partner/")) {
       if (m[1] !== PARTNER_KEY) {
@@ -313,6 +332,33 @@ export async function startFakeApi() {
       }
       if (r.status >= 400) return problem(r.status, { title: r.body.title, code: r.body.code, detail: r.body.detail, retryable: r.body.retryable });
       return json(r.status, r.body);
+    }
+    if (req.method === "POST" && p === "/v1/brand") {
+      return json(200, { url: body.url, final_url: body.url, identity: { name: "Example", description: "d", language: "en", domain: "example.com", theme_color: null, tagline: "" }, credits: 3, engine: "js", warnings: [] }, { "X-Credits-Charged": "3" });
+    }
+    let wm;
+    if ((wm = /^\/v1\/webhooks(?:\/([^/]+)(?:\/(test|rotate-secret|deliveries))?)?$/.exec(p))) {
+      const [, id, sub] = wm;
+      if (!id && req.method === "GET") return json(200, { data: [WEBHOOK] });
+      if (!id && req.method === "POST") return json(201, { ...WEBHOOK, ...body, secret: WEBHOOK_SECRET });
+      if (id && !sub && req.method === "GET") return json(200, WEBHOOK);
+      if (id && !sub && req.method === "PATCH") return json(200, { ...WEBHOOK, ...body });
+      if (id && !sub && req.method === "DELETE") return res.writeHead(204).end();
+      if (sub === "test" && req.method === "POST") return json(202, { delivery_id: "del_1" });
+      if (sub === "rotate-secret" && req.method === "POST") return json(200, { ...WEBHOOK, secret_version: 2, secret: WEBHOOK_SECRET });
+      if (sub === "deliveries" && req.method === "GET") return json(200, { data: [{ id: "del_1", event: "ping", status: "delivered", attempts: 1 }] });
+    }
+    let mm;
+    if ((mm = /^\/v1\/monitors(?:\/([^/]+)(?:\/(check|changes|pages))?)?$/.exec(p))) {
+      const [, id, sub] = mm;
+      if (!id && req.method === "GET") return json(200, { data: [MONITOR] });
+      if (!id && req.method === "POST") return json(201, { ...MONITOR, ...body });
+      if (id && !sub && req.method === "GET") return json(200, MONITOR);
+      if (id && !sub && req.method === "PATCH") return json(200, { ...MONITOR, ...body });
+      if (id && !sub && req.method === "DELETE") return res.writeHead(204).end();
+      if (sub === "check" && req.method === "POST") return json(200, { outcome: "unchanged", credits: 1 });
+      if (sub === "changes" && req.method === "GET") return json(200, { data: [] });
+      if (sub === "pages" && req.method === "GET") return json(200, { data: [{ url: "https://example.com/a" }], next_cursor: "cur2" });
     }
     if (req.method === "GET" && p === "/v1/requests") {
       return json(200, { requests: [], page: { has_more: false, retention_hours: 24 } });
