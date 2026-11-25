@@ -3,6 +3,13 @@
 All notable changes to `@spicrawl/mcp` are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.3.1 — Brand, webhooks and monitors — 2026-11-25
+
+- **Added:** `spicrawl_brand` returns a site's identity, logo links, icons, colours, fonts, images, video links and socials from one rendered page. Links only, nothing downloaded. Billed like a JavaScript-rendered scrape (3 credits typically); a failed call costs 0. It is offered to every standard key.
+- **Added:** eight webhook tools (list, get, create, update, delete, test, rotate the secret, recent deliveries) for a key with the `webhooks` scope. `spicrawl_webhook_create` and `spicrawl_webhook_rotate_secret` return the signing secret once.
+- **Added:** eight monitor tools (list, get, create, update, delete, check now, change history, site pages) for a key with the `monitors` scope. A monitor watches a page or a whole site and reports confirmed changes to a webhook endpoint. `spicrawl_monitor_check` spends credits.
+- **Changed:** a session's tools follow its key's scopes as well as its partner status. The webhook and monitor tools are not in the keyless tool list or the server card.
+
 ## 0.3.0 — 2026-11-23
 
 - **Added:** partner tools for a platform that resells Spicrawl to its own users: account summary and balance; users (list, read, rename, move tier, suspend, reactivate); usage per day and per user; tiers (list, create, update, delete); giving credits to a user. A partner key is offered these and the docs tools; any other key gets the same 27 tools as before. Creating a user is not offered, because its response carries that user's API key.

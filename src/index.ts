@@ -33,7 +33,7 @@
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { ILayerClient, PACKAGE_VERSION } from "./client.js";
 import { buildServer } from "./server.js";
-import { keyInfo, toolProfile } from "./profile.js";
+import { keyInfo, keyScopes, toolProfile } from "./profile.js";
 
 const USAGE = `spicrawl-mcp ${PACKAGE_VERSION} — the Spicrawl MCP server
 
@@ -55,7 +55,7 @@ async function stdio() {
   // Asked once at startup, as the HTTP server asks once per session.
   const info = await keyInfo(client);
   if (!info) console.error("key info unavailable: the standard tools are listed");
-  const server = buildServer(client, { profile: toolProfile(info) });
+  const server = buildServer(client, { profile: toolProfile(info), scopes: keyScopes(info) });
   const transport = new StdioServerTransport();
   await server.connect(transport);
   // stdout is the transport; logs go to stderr.

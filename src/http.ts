@@ -51,7 +51,7 @@ import { apiKeyFromRequest, presentsCredentials, readJSON, rpcError } from "./ht
 import { chatgptConfigFromEnv, type ChatgptConfig } from "./chatgpt/oauth.js";
 import { chatgptRoutes } from "./chatgpt/http.js";
 import { buildServerCard } from "./card.js";
-import { keyInfo, toolProfile } from "./profile.js";
+import { keyInfo, keyScopes, toolProfile } from "./profile.js";
 
 const ADDR = process.env.SPICRAWL_MCP_ADDR || "127.0.0.1:8090";
 const BASE_URL = process.env.SPICRAWL_BASE_URL || "http://127.0.0.1:8080";
@@ -244,7 +244,7 @@ async function handleMcp(req: IncomingMessage, res: ServerResponse) {
   const client = new ILayerClient({ apiKey: key, baseURL: BASE_URL, publicBaseURL: PUBLIC_BASE_URL });
   const info = await keyInfo(client);
   if (!info) log("key info unavailable: this session gets the standard tools");
-  const server = buildServer(client, { profile: toolProfile(info) });
+  const server = buildServer(client, { profile: toolProfile(info), scopes: keyScopes(info) });
   const transport: StreamableHTTPServerTransport = new StreamableHTTPServerTransport({
     sessionIdGenerator: () => randomUUID(),
     onsessioninitialized: (id) => {

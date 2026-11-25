@@ -28,6 +28,14 @@ export function toolProfile(info: KeyInfo | null | undefined): ToolProfile {
 }
 
 /**
+ * The scopes the key holds, as GET /v1/key lists them. Empty when the answer is missing.
+ * Decides which optional groups (webhooks, monitors) a session is offered.
+ */
+export function keyScopes(info: KeyInfo | null | undefined): string[] {
+  return info && Array.isArray(info.scopes) ? info.scopes.filter((s): s is string => typeof s === "string") : [];
+}
+
+/**
  * GET /v1/key for the client's key, or null when it cannot be answered: an older
  * API without the route, an error, or no answer within KEY_INFO_TIMEOUT_MS.
  * Asked once per session; nothing is cached beyond it.

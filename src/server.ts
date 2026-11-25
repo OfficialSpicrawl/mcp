@@ -13,6 +13,9 @@ import { registerUsageTools } from "./tools/usage.js";
 import { registerRequestsTools } from "./tools/requests.js";
 import { registerBrowserTools } from "./tools/browser.js";
 import { registerDocsTools } from "./tools/docs.js";
+import { registerBrandTools } from "./tools/brand.js";
+import { registerWebhookTools } from "./tools/webhooks.js";
+import { registerMonitorTools } from "./tools/monitors.js";
 
 export const SERVER_NAME = "spicrawl-mcp-server";
 export const SERVER_VERSION = PACKAGE_VERSION;
@@ -189,6 +192,12 @@ export interface ServerOptions {
    * (a partner key, see src/profile.ts) is the partner tools and the docs tools.
    */
   profile?: ToolProfile;
+  /**
+   * The scopes the key holds (GET /v1/key). The webhook tools are offered only with the
+   * `webhooks` scope and the monitor tools only with `monitors`, so a key without one never
+   * sees tools that would answer 403. Not used by the partner profile.
+   */
+  scopes?: readonly string[];
 }
 
 /**
@@ -198,17 +207,21 @@ export interface ServerOptions {
 export function buildServer(client: ILayerClient, options: ServerOptions = {}): McpServer {
   const toolOptions: ToolOptions = { hideUnavailable: options.hideUnavailable ?? hideUnavailableFromEnv() };
   const server = new SpicrawlMcpServer({ name: SERVER_NAME, version: SERVER_VERSION });
+  const scopes = options.scopes ?? [];
   const registers: RegisterTools[] =
     options.profile === "partner"
       ? [registerPartnerTools, registerDocsTools]
       : [
           registerScrapeTools,
+          registerBrandTools,
           registerBatchTools,
           registerSessionsTools,
           registerUsageTools,
           registerRequestsTools,
           registerBrowserTools,
           registerDocsTools,
+          ...(scopes.includes("webhooks") ? [registerWebhookTools] : []),
+          ...(scopes.includes("monitors") ? [registerMonitorTools] : []),
         ];
   for (const register of registers) register(server, client, toolOptions);
   return server;
