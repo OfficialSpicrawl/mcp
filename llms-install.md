@@ -68,7 +68,7 @@ Both options serve the same tools and run under the same key, limits and credits
 
 ## Notes for the agent
 
-- Leave `autoApprove` empty at first. `spicrawl_scrape` is not read-only: its `method` and `actions`
+- Leave `autoApprove` empty at first. `spicrawl_scrape` is not read-only: its `method`, `body` and `actions`
   arguments can submit forms or click on the target site, so set them only when the user asks.
 - `spicrawl_batch_cancel`, `spicrawl_session_release` and `spicrawl_session_delete` are destructive.
 - Add `"render": true` to `spicrawl_scrape` for pages that need JavaScript. Spicrawl picks the

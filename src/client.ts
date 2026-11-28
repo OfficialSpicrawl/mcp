@@ -98,6 +98,8 @@ interface Problem {
   feedback_url?: string;
   /** Advice on why the request failed and what to change (string array). */
   notes?: string[];
+  /** The caller's request corrected (method added, a browser flag removed, `headers` renamed). Resendable as is. */
+  fix?: unknown;
   diagnostics?: { hint?: string };
 }
 
@@ -115,6 +117,8 @@ export class ILayerError extends Error {
   readonly notes: string[];
   /** `diagnostics.hint`, the API's one-line advice on what to change. */
   readonly hint?: string;
+  /** The API's corrected request, when it can say one (the body's `fix`). */
+  readonly fix?: unknown;
 
   constructor(status: number, problem: Problem, fallback: string, headerRequestId?: string, reportable = false) {
     const detail = problem.detail || problem.title || fallback;
@@ -128,6 +132,7 @@ export class ILayerError extends Error {
     this.feedbackUrl = reportable ? problem.feedback_url || undefined : undefined;
     this.notes = Array.isArray(problem.notes) ? problem.notes.filter((n) => typeof n === "string") : [];
     this.hint = problem.diagnostics?.hint || undefined;
+    this.fix = problem.fix ?? undefined;
   }
 }
 

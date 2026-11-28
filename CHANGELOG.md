@@ -8,6 +8,8 @@ All notable changes to `@spicrawl/mcp` are documented here. This project follows
 - **Added:** `spicrawl_feedback` reports a request that failed in a way the agent could not fix, or returned wrong or missing content. Free. A thumbs-down on a charged request refunds its credits, up to a daily cap per account. Offered to every standard key, not to a partner key or the ChatGPT endpoint.
 - **Added:** a failed call that Spicrawl can fix carries its request id in the error text, with the call to make to report it. Every failed call's error text names its request id.
 - **Added:** the server tells the client at initialize when to report a failed call.
+- **Added:** `spicrawl_scrape` sends a request body with `body` (an object or array as JSON, or a string as-is) for `method` POST, PUT, PATCH or DELETE, over a plain fetch. The workspace must have it enabled (ask Support). Not on batch items, and not on the ChatGPT endpoint.
+- **Added:** an error the API can correct says so in its text: a `Corrected request:` line with the request as compact JSON, ready to resend.
 
 ## 0.3.1 — Brand, webhooks and monitors — 2026-11-25
 

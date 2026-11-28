@@ -138,9 +138,11 @@ export async function run(
   } catch (err) {
     // The hint: diagnostics.hint, else the notes joined; skipped when the message already says it.
     const hint = err instanceof ILayerError ? (err.hint ?? (err.notes.length ? err.notes.join(" ") : undefined)) : undefined;
+    // The API's corrected request, as compact JSON the agent can resend (names renamed below like the rest).
+    const fix = err instanceof ILayerError && err.fix !== undefined ? `\nCorrected request: ${JSON.stringify(err.fix)}` : "";
     const message =
       err instanceof ILayerError
-        ? `${err.code}: ${err.message}${err.retryable ? " (retryable — the same request may succeed on a retry)" : ""}${
+        ? `${err.code}: ${err.message}${err.retryable ? " (retryable — the same request may succeed on a retry)" : ""}${fix}${
             err.docUrl ? `\nSee ${err.docUrl}` : ""
           }${hint && !err.message.includes(hint) ? `\nHint: ${hint}` : ""}${showRequestId ? requestIdLine(err) : ""}${feedbackHint(err)}`
         : err instanceof Error

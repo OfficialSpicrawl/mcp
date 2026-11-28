@@ -84,7 +84,9 @@ Check each site's terms and `robots.txt` before you scrape it.
 
 | Tool | What it does | Key parameters |
 |---|---|---|
-| `spicrawl_scrape` | Retrieve one URL as `markdown` (default), `text`, `html`, `json` or `pdf`, with optional rendering, extraction, links, screenshots and browser actions. | `url`, `format`, `render`, `mode`, `main_content_only`, `include_tags`, `exclude_tags`, `extract`, `autoparse`, `links`, `screenshot`, `actions`, `wait_for`, `scroll_pages`, `session_id`, `proxy`, `cache`, `max_cost` |
+| `spicrawl_scrape` | Retrieve one URL as `markdown` (default), `text`, `html`, `json` or `pdf`, with optional rendering, extraction, links, screenshots and browser actions. | `url`, `format`, `render`, `mode`, `main_content_only`, `include_tags`, `exclude_tags`, `extract`, `autoparse`, `links`, `screenshot`, `actions`, `wait_for`, `scroll_pages`, `session_id`, `proxy`, `cache`, `max_cost`, `method`, `custom_headers`, `body` |
+
+To call a site's JSON API or submit a POST form, set `method` to POST, PUT, PATCH or DELETE and pass `body` (a plain fetch, with the workspace's body feature enabled). See [sending a request body](https://docs.spicrawl.com/guides/post-requests).
 
 ### Brand
 
