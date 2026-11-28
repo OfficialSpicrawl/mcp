@@ -20,9 +20,9 @@ const ScrapeInput = {
     ),
   format: z
     .enum(["markdown", "text", "html", "json", "pdf"])
-    .default("markdown")
+    .optional()
     .describe(
-      "Output format. 'markdown' (default) is best for feeding to an LLM; 'html' returns the raw document; " +
+      "Output format. 'markdown' (default for a page) is best for feeding to an LLM; with a `body` the default is 'html', the raw response, because API answers are usually JSON. 'html' returns the raw document; " +
         "'json' returns the main content as markdown in `content` plus `sections` ([{level, heading, text}], split on headings); " +
         "'pdf' prints the page in a full browser (routed there for you) and returns the file as a resource content block.",
     ),
@@ -127,7 +127,8 @@ const ScrapeInput = {
     .describe(
       "Request body for a POST, PUT, PATCH or DELETE `method`, over a plain fetch (no render, actions or screenshots). " +
         "Use it to call a site's JSON or GraphQL API, submit a POST search form, or reach a JSON-RPC/MCP endpoint. " +
-        "An object or array is sent as JSON; a string is sent as-is. Up to 64 KB. The workspace must have it enabled.",
+        "An object or array is sent as JSON; a string is sent as-is. Up to 64 KB. The workspace must have it enabled. " +
+        "With a `body` and no `format`, the response comes back raw (format html), since API answers are usually JSON.",
     ),
   session_id: z
     .string()
@@ -257,7 +258,9 @@ server.registerTool(
     },
   },
   async (input) => {
-    const params: Record<string, unknown> = { url: input.url, response_format: input.format };
+    // A body usually calls a JSON API, which cannot be rendered as markdown: default to the raw response.
+    const format = input.format ?? (input.body !== undefined ? "html" : "markdown");
+    const params: Record<string, unknown> = { url: input.url, response_format: format };
     // A screenshot needs a browser, so it turns rendering on rather than failing with INCOMPATIBLE_FLAGS.
     if (input.render || input.screenshot) params.js_render = true;
     if (input.main_content_only !== undefined) params.main_content_only = input.main_content_only;
