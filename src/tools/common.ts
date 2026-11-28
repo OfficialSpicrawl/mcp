@@ -76,6 +76,7 @@ export async function run(
   fn: () => Promise<unknown>,
   attach?: (data: unknown) => Attached,
   argNames?: Record<string, string>,
+  showRequestId = true,
 ) {
   const rename = (text: string) => (argNames ? renameArgs(text, argNames) : text);
   try {
@@ -137,11 +138,13 @@ export async function run(
   } catch (err) {
     // The hint: diagnostics.hint, else the notes joined; skipped when the message already says it.
     const hint = err instanceof ILayerError ? (err.hint ?? (err.notes.length ? err.notes.join(" ") : undefined)) : undefined;
+    // The API's corrected request, as compact JSON the agent can resend (names renamed below like the rest).
+    const fix = err instanceof ILayerError && err.fix !== undefined ? `\nCorrected request: ${correctedRequest(err.fix)}` : "";
     const message =
       err instanceof ILayerError
-        ? `${err.code}: ${err.message}${err.retryable ? " (retryable — the same request may succeed on a retry)" : ""}${
+        ? `${err.code}: ${err.message}${err.retryable ? " (retryable — the same request may succeed on a retry)" : ""}${fix}${
             err.docUrl ? `\nSee ${err.docUrl}` : ""
-          }${hint && !err.message.includes(hint) ? `\nHint: ${hint}` : ""}`
+          }${hint && !err.message.includes(hint) ? `\nHint: ${hint}` : ""}${showRequestId ? requestIdLine(err) : ""}${feedbackHint(err)}`
         : err instanceof Error
           ? err.message
           : String(err);
@@ -150,6 +153,23 @@ export async function run(
       content: [{ type: "text" as const, text: rename(message) }],
     };
   }
+}
+
+/** The failed call's request id, unless the message already names it. */
+function requestIdLine(err: ILayerError): string {
+  return err.requestId && !err.message.includes(err.requestId) ? `\nRequest ID: ${err.requestId}` : "";
+}
+
+/**
+ * The reporting hint for a failure the API marks reportable (it carries feedback_url).
+ * Only a failure with a request id gets it, since the report needs that id.
+ */
+function feedbackHint(err: ILayerError): string {
+  if (!err.feedbackUrl || !err.requestId) return "";
+  return (
+    `\nReport this to Spicrawl so it gets fixed: call spicrawl_feedback with request_id "${err.requestId}" ` +
+    "and what you were trying to get (once per task; a charged request is refunded)."
+  );
 }
 
 function isString(v: unknown): v is string {
@@ -178,4 +198,13 @@ export function renameArgs(text: string, names: Record<string, string>): string 
     out = out.replace(new RegExp(`(?<![A-Za-z0-9_/.-])${api}(?![A-Za-z0-9_])`, "g"), arg);
   }
   return out;
+}
+
+/** Compact JSON of the API's fix; a big `body` (up to 64 KB) is replaced by its size once the line passes 2000 chars. */
+export function correctedRequest(fix: unknown): string {
+  const json = JSON.stringify(fix);
+  if (json.length <= 2000 || typeof fix !== "object" || fix === null || !("body" in fix)) return json;
+  const body = (fix as { body: unknown }).body;
+  const n = Buffer.byteLength(typeof body === "string" ? body : JSON.stringify(body));
+  return JSON.stringify({ ...fix, body: `<your body, ${n} bytes>` });
 }

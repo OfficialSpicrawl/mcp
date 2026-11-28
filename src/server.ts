@@ -16,9 +16,15 @@ import { registerDocsTools } from "./tools/docs.js";
 import { registerBrandTools } from "./tools/brand.js";
 import { registerWebhookTools } from "./tools/webhooks.js";
 import { registerMonitorTools } from "./tools/monitors.js";
+import { registerFeedbackTools } from "./tools/feedback.js";
 
 export const SERVER_NAME = "spicrawl-mcp-server";
 export const SERVER_VERSION = PACKAGE_VERSION;
+
+/** Sent to the client at initialize, so an agent knows when to report a failed call. */
+export const SERVER_INSTRUCTIONS =
+  "When a Spicrawl call fails, or returns wrong or missing content you cannot fix, report it once with spicrawl_feedback, " +
+  "giving the request_id and what you were trying to get. Never include secrets, API keys or page content in a report.";
 
 // ---------------------------------------------------------------------------
 // Unknown arguments are refused, never dropped.
@@ -206,7 +212,11 @@ export interface ServerOptions {
  */
 export function buildServer(client: ILayerClient, options: ServerOptions = {}): McpServer {
   const toolOptions: ToolOptions = { hideUnavailable: options.hideUnavailable ?? hideUnavailableFromEnv() };
-  const server = new SpicrawlMcpServer({ name: SERVER_NAME, version: SERVER_VERSION });
+  const server = new SpicrawlMcpServer(
+    { name: SERVER_NAME, version: SERVER_VERSION },
+    // Only the standard set registers spicrawl_feedback, so only it gets the sentence about reporting.
+    { instructions: options.profile === "partner" ? undefined : SERVER_INSTRUCTIONS },
+  );
   const scopes = options.scopes ?? [];
   const registers: RegisterTools[] =
     options.profile === "partner"
@@ -220,6 +230,7 @@ export function buildServer(client: ILayerClient, options: ServerOptions = {}): 
           registerRequestsTools,
           registerBrowserTools,
           registerDocsTools,
+          registerFeedbackTools,
           ...(scopes.includes("webhooks") ? [registerWebhookTools] : []),
           ...(scopes.includes("monitors") ? [registerMonitorTools] : []),
         ];

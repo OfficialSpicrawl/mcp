@@ -115,9 +115,20 @@ const ScrapeInput = {
     .string()
     .optional()
     .describe(
-      "HTTP method sent to the target (default GET; no request body can be sent). Anything but GET, HEAD or OPTIONS can change state on the target site: use it only when the user asks.",
+      "HTTP method sent to the target: GET (default), HEAD, OPTIONS, or POST, PUT, PATCH, DELETE with `body`. Anything but GET, HEAD or OPTIONS can change state on the target site: use it only when the user asks.",
     ),
-  custom_headers: z.record(z.string()).optional().describe("Extra request headers sent to the target, e.g. {\"Accept-Language\":\"de\"}."),
+  custom_headers: z
+    .record(z.string())
+    .optional()
+    .describe("Extra request headers sent to the target, e.g. {\"Accept-Language\":\"de\"}. With a string `body`, set Content-Type here."),
+  body: z
+    .union([z.record(z.any()), z.array(z.any()), z.string()])
+    .optional()
+    .describe(
+      "Request body for a POST, PUT, PATCH or DELETE `method`, over a plain fetch (no render, actions or screenshots). " +
+        "Use it to call a site's JSON or GraphQL API, submit a POST search form, or reach a JSON-RPC/MCP endpoint. " +
+        "An object or array is sent as JSON; a string is sent as-is. Up to 64 KB. The workspace must have it enabled.",
+    ),
   session_id: z
     .string()
     .optional()
@@ -203,7 +214,7 @@ const ScrapeOutput = loose({
 
 /** Arguments passed to the API unchanged: the tool uses the REST name. */
 const PASSTHROUGH = [
-  "mode", "stealth", "method", "custom_headers", "session_id", "sticky_key",
+  "mode", "stealth", "method", "custom_headers", "body", "session_id", "sticky_key",
   "proxy_verify", "wait_for", "wait_for_timeout", "block_resources", "screenshot_fullpage",
   "screenshot_selector", "screenshot_format", "screenshot_quality", "autoparse", "extract_preset",
   "network_capture", "parse_pdf", "max_cost", "original_status", "allowed_status_codes", "scroll_pages",
@@ -226,6 +237,7 @@ server.registerTool(
       "Results are cached by default, and a cache hit is billed like the fetch that stored it (the cache saves time, not credits); set `cache=false` for time-sensitive pages. " +
       "With the defaults it only reads the page. A `method` other than GET, HEAD or OPTIONS, and the `actions` that click, fill or run scripts on the page, " +
       "can change state on the target site: set them only when the user asks for that. " +
+      "`body` sends a request body with POST, PUT, PATCH or DELETE over a plain fetch; the workspace must have it enabled. " +
       "For markdown, text and HTML it returns `{ content }`. With `format: \"json\"`, or when " +
       `\`extract\`, ${aiExtractKey}\`autoparse\`, \`links\`, \`screenshot\` or \`network_capture\` is set, it returns the JSON envelope: ` +
       "`content`, the site's `status`, `credits`, `engine` (the rendering tier: `fetch`, `js` or `browser`), `warnings` and `data` for extraction. " +

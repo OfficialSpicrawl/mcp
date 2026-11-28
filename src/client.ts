@@ -92,8 +92,14 @@ interface Problem {
   retryable?: boolean;
   target_status?: number | null;
   doc_url?: string;
+  /** The request id of the failed call; error bodies always carry it. */
+  request_id?: string;
+  /** Present when the failure is one a report to Spicrawl can fix (see spicrawl_feedback). */
+  feedback_url?: string;
   /** Advice on why the request failed and what to change (string array). */
   notes?: string[];
+  /** The caller's request corrected (method added, a browser flag removed, `headers` renamed). Resendable as is. */
+  fix?: unknown;
   diagnostics?: { hint?: string };
 }
 
@@ -103,12 +109,18 @@ export class ILayerError extends Error {
   readonly status: number;
   readonly retryable: boolean;
   readonly docUrl?: string;
+  /** The failed call's request id: the body's `request_id`, else the X-Request-Id header. */
+  readonly requestId?: string;
+  /** Set when the failure is reportable with spicrawl_feedback. */
+  readonly feedbackUrl?: string;
   /** Advice from the API about this failure (the body's `notes`, else X-Note). */
   readonly notes: string[];
   /** `diagnostics.hint`, the API's one-line advice on what to change. */
   readonly hint?: string;
+  /** The API's corrected request, when it can say one (the body's `fix`). */
+  readonly fix?: unknown;
 
-  constructor(status: number, problem: Problem, fallback: string) {
+  constructor(status: number, problem: Problem, fallback: string, headerRequestId?: string, reportable = false) {
     const detail = problem.detail || problem.title || fallback;
     super(detail);
     this.name = "ILayerError";
@@ -116,8 +128,11 @@ export class ILayerError extends Error {
     this.status = problem.status ?? status;
     this.retryable = problem.retryable ?? status >= 500;
     this.docUrl = problem.doc_url;
+    this.requestId = problem.request_id || headerRequestId || undefined;
+    this.feedbackUrl = reportable ? problem.feedback_url || undefined : undefined;
     this.notes = Array.isArray(problem.notes) ? problem.notes.filter((n) => typeof n === "string") : [];
     this.hint = problem.diagnostics?.hint || undefined;
+    this.fix = problem.fix ?? undefined;
   }
 }
 
@@ -156,6 +171,11 @@ export class ILayerClient {
   /** Public docs base, e.g. https://docs.spicrawl.com; no trailing slash. */
   readonly docsBaseURL: string;
   private readonly timeoutMs: number;
+  /**
+   * Set by the server that registered spicrawl_feedback (registerFeedbackTools). Only then
+   * does a failure carry feedbackUrl, so a surface without the tool never tells an agent to call it.
+   */
+  feedbackTools = false;
 
   constructor(config: ClientConfig) {
     if (!config.apiKey) {
@@ -248,6 +268,8 @@ export class ILayerClient {
         response.status,
         parsed as Problem,
         `Request failed with HTTP ${response.status}`,
+        response.headers.get("x-request-id") ?? undefined,
+        this.feedbackTools,
       );
     }
     return parsed;
