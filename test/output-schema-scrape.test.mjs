@@ -104,6 +104,19 @@ describe("spicrawl_scrape", () => {
     assert.deepEqual(JSON.parse(res.content[0].text), res.structuredContent);
   });
 
+  test("a JSON page (POST + body, default format) is the content, not the envelope", async () => {
+    const res = ok(await call("spicrawl_scrape", { url: "https://jsonpage.test/", method: "POST", body: '{"q":1}' }));
+    assert.equal(typeof res.structuredContent.content, "string");
+    assert.match(res.structuredContent.content, /"json":\{"q":1\}/);
+    assert.equal(res.structuredContent.data, undefined);
+  });
+
+  test("a platform problem on the same request is still an error with its code", async () => {
+    const res = await call("spicrawl_scrape", { url: "https://badbody.test/", method: "POST", body: '{"q":1}' });
+    assert.equal(res.isError, true);
+    assert.match(JSON.stringify(res), /ERR::REQUEST::BODY_NEEDS_METHOD/);
+  });
+
   test("the JSON envelope validates, and fields the schema does not know ride along", async () => {
     const res = ok(await call("spicrawl_scrape", { url: "https://envelope.test/", format: "json" }));
     assert.deepEqual(res.structuredContent, ENVELOPE_PAYLOAD);

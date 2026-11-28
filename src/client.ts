@@ -197,8 +197,7 @@ export class ILayerClient {
 
   /** POST /v1/scrape — retrieve, render, and extract one URL. */
   async scrape(params: Record<string, unknown>): Promise<unknown> {
-    const rawContent = params.response_format !== undefined && params.response_format !== "json";
-    return this.request("POST", "/v1/scrape", params, { rawContent });
+    return this.request("POST", "/v1/scrape", params, { rawContent: scrapeIsRaw(params) });
   }
 
   /** Any REST call. Tools for newer endpoints use this directly. */
@@ -285,6 +284,15 @@ export class ILayerClient {
     }
     return parsed;
   }
+}
+
+/** Envelope-forcing options: with any of these set, the API answers with the JSON envelope whatever the format. */
+const ENVELOPE_KEYS = ["extract", "ai_extract", "autoparse", "links", "screenshot", "network_capture", "extract_preset"];
+
+/** True when a scrape's reply is the page itself: a non-json format and nothing that forces the envelope. */
+export function scrapeIsRaw(params: Record<string, unknown>): boolean {
+  const f = params.response_format;
+  return f !== undefined && f !== "json" && !ENVELOPE_KEYS.some((k) => params[k]);
 }
 
 /**

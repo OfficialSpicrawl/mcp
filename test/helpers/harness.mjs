@@ -373,6 +373,13 @@ export async function startFakeApi() {
       res.end("# Raw page\n");
       return;
     }
+    // A site whose page is itself JSON (an httpbin-style echo), served raw with X-Engine.
+    if (req.method === "POST" && p === "/v1/scrape" && body?.url === "https://jsonpage.test/") {
+      return json(200, { args: {}, data: '{"q":1}', json: { q: 1 } }, { "X-Engine": "fetch", "X-Target-Status": "200", "X-Credits-Charged": "1" });
+    }
+    if (req.method === "POST" && p === "/v1/scrape" && body?.url === "https://badbody.test/") {
+      return problem(400, { title: "Bad Request", code: "ERR::REQUEST::BODY_NEEDS_METHOD", detail: "body needs a method", retryable: false });
+    }
     if (req.method === "POST" && p === "/v1/scrape" && body?.url === "https://envelope.test/") {
       return json(200, ENVELOPE_PAYLOAD, { "X-Engine": "browser", "X-Request-Id": "01TESTENV00000000000000000" });
     }

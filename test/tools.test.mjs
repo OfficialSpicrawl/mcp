@@ -107,7 +107,7 @@ describe("screenshots", () => {
   });
 
   test("a scrape without screenshots is returned unchanged, with no image block", async () => {
-    const res = await call("spicrawl_scrape", { url: "https://example.com" });
+    const res = await call("spicrawl_scrape", { url: "https://example.com", format: "json" });
     ok(res);
     const expected = { content: "# Example Domain\n", meta: { engine: "fetch", status: 200, credits: 1 } };
     assert.equal(res.content.length, 1);
