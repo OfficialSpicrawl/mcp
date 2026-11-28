@@ -22,7 +22,7 @@ type FeedbackResult = {
 
 /** Refusals the caller can act on, by status. Anything else goes through the shared error rendering. */
 const REFUSED: Record<number, string> = {
-  404: "Not your request: no request with that id belongs to this key. Feedback was not recorded.",
+  404: "No such request for this API key, or it is older than your log retention. If the request failed just now, wait a few seconds and try once more.",
   409: "This request was rate- or quota-limited, so it cannot take feedback. Feedback was not recorded.",
   429: "Feedback limit reached; do not retry.",
 };

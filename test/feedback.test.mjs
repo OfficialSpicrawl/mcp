@@ -207,8 +207,8 @@ describe("spicrawl_feedback results", () => {
   test("404: an error that the request is not theirs", async () => {
     const res = await report({ request_id: "req_404" });
     assert.equal(res.isError, true);
-    assert.match(textOf(res), /Not your request/);
-    assert.match(textOf(res), /not recorded/);
+    assert.match(textOf(res), /No such request for this API key/);
+    assert.match(textOf(res), /wait a few seconds and try once more/);
   });
 
   test("409: an error that the request cannot take feedback", async () => {
