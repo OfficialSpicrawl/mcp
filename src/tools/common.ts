@@ -139,7 +139,7 @@ export async function run(
     // The hint: diagnostics.hint, else the notes joined; skipped when the message already says it.
     const hint = err instanceof ILayerError ? (err.hint ?? (err.notes.length ? err.notes.join(" ") : undefined)) : undefined;
     // The API's corrected request, as compact JSON the agent can resend (names renamed below like the rest).
-    const fix = err instanceof ILayerError && err.fix !== undefined ? `\nCorrected request: ${JSON.stringify(err.fix)}` : "";
+    const fix = err instanceof ILayerError && err.fix !== undefined ? `\nCorrected request: ${correctedRequest(err.fix)}` : "";
     const message =
       err instanceof ILayerError
         ? `${err.code}: ${err.message}${err.retryable ? " (retryable — the same request may succeed on a retry)" : ""}${fix}${
@@ -198,4 +198,13 @@ export function renameArgs(text: string, names: Record<string, string>): string 
     out = out.replace(new RegExp(`(?<![A-Za-z0-9_/.-])${api}(?![A-Za-z0-9_])`, "g"), arg);
   }
   return out;
+}
+
+/** Compact JSON of the API's fix; a big `body` (up to 64 KB) is replaced by its size once the line passes 2000 chars. */
+export function correctedRequest(fix: unknown): string {
+  const json = JSON.stringify(fix);
+  if (json.length <= 2000 || typeof fix !== "object" || fix === null || !("body" in fix)) return json;
+  const body = (fix as { body: unknown }).body;
+  const n = Buffer.byteLength(typeof body === "string" ? body : JSON.stringify(body));
+  return JSON.stringify({ ...fix, body: `<your body, ${n} bytes>` });
 }
