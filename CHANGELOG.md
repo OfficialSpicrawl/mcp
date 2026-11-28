@@ -3,6 +3,10 @@
 All notable changes to `@spicrawl/mcp` are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.4.2 — Raw body response — 2026-11-28
+
+- **Fixed:** `spicrawl_scrape` with a `body` and no `format` returns the raw response instead of failing with `ERR::EXTRACT::FAILED` on JSON APIs. `format` defaults to `html` when a `body` is sent, and to `markdown` otherwise.
+
 ## 0.4.1 — Origin check and security headers — 2026-11-28
 
 - **Fixed:** the hosted MCP endpoint validates the `Origin` header, as the MCP transport spec requires against DNS rebinding. A request with no `Origin` (a server-to-server client) is served as before. A browser request is served only from an allowed origin: `http://localhost`, `http://127.0.0.1` and `http://[::1]` on any port, `https://claude.ai`, `https://chatgpt.com`, `https://chat.openai.com`, and `https://spicrawl.com` or any `https` subdomain of it. Any other origin gets `403` with a JSON-RPC error. Add origins with `SPICRAWL_MCP_ALLOWED_ORIGINS`; `*` turns the check off.

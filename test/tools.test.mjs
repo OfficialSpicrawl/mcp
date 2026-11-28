@@ -380,6 +380,26 @@ describe("spicrawl_scrape actions", () => {
   });
 });
 
+describe("spicrawl_scrape default format", () => {
+  const sentFormat = async (args) => {
+    const before = scrapeRequests().length;
+    await call("spicrawl_scrape", { url: "https://example.com/", ...args });
+    return scrapeRequests().slice(before)[0].body.response_format;
+  };
+
+  test("a request body defaults to the raw response (html)", async () => {
+    assert.equal(await sentFormat({ method: "POST", body: { q: 1 } }), "html");
+  });
+
+  test("no body and no format defaults to markdown", async () => {
+    assert.equal(await sentFormat({}), "markdown");
+  });
+
+  test("an explicit format wins over the body default", async () => {
+    assert.equal(await sentFormat({ method: "POST", body: { q: 1 }, format: "markdown" }), "markdown");
+  });
+});
+
 describe("spicrawl_batch_submit output format", () => {
   const submits = () => api.requests.filter((r) => r.method === "POST" && r.path === "/v1/batch");
 
