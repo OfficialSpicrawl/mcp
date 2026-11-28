@@ -25,6 +25,7 @@ const STANDARD = [
   "spicrawl_session_delete", "spicrawl_usage", "spicrawl_usage_summary", "spicrawl_usage_reconciliation", "spicrawl_requests_list",
   "spicrawl_request_get", "spicrawl_browser_connect_url", "spicrawl_browser_live_view", "spicrawl_browser_control",
   "spicrawl_docs_search", "spicrawl_docs_read", "spicrawl_docs_index",
+  "spicrawl_feedback",
 ];
 const PARTNER_NAMES = [
   "spicrawl_partner_summary", "spicrawl_partner_balance", "spicrawl_partner_users_list", "spicrawl_partner_user_get",
@@ -99,10 +100,10 @@ describe("the profile decision", () => {
 });
 
 describe("which tools a session is offered", () => {
-  test("an ordinary key gets the 28 standard tools and no partner tool", async () => {
+  test("an ordinary key gets the 29 standard tools and no partner tool", async () => {
     const { tools } = await ordinary.listTools();
     assert.deepEqual(names(tools), [...STANDARD].sort());
-    assert.equal(tools.length, 28);
+    assert.equal(tools.length, 29);
     assert.deepEqual(tools.filter((t) => t.name.startsWith("spicrawl_partner_")), []);
   });
 
@@ -121,9 +122,9 @@ describe("which tools a session is offered", () => {
     assert.equal(api.requests.length, before, "nothing reached the API");
   });
 
-  test("keyless discovery and the server card still list the 28 standard tools and no partner tool", async () => {
+  test("keyless discovery and the server card still list the 29 standard tools and no partner tool", async () => {
     const card = await (await fetch(`${mcp.base}/.well-known/mcp/server-card.json`)).json();
-    assert.equal(card.tools.length, 28);
+    assert.equal(card.tools.length, 29);
     assert.deepEqual(card.tools.filter((t) => t.name.startsWith("spicrawl_partner_")), []);
     const keyless = await rawPost(mcp.mcpURL, { body: TOOLS_LIST_BODY });
     const listed = JSON.parse(keyless.text).result.tools;

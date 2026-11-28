@@ -137,6 +137,14 @@ While a person has control, the agent's input and navigation commands fail with 
 | `spicrawl_requests_list` | Recent API calls with status, error code, rendering tier, latency and credits. | `only_errors`, `status`, `limit`, `all_projects` |
 | `spicrawl_request_get` | The full log record of one call. | `id` |
 
+### Feedback
+
+| Tool | What it does | Key parameters |
+|---|---|---|
+| `spicrawl_feedback` | Report a call that failed in a way the agent could not fix, or returned wrong or missing content. Free. A thumbs-down on a charged call refunds its credits (daily cap per account). Offered to every standard key. | `request_id`, `rating`, `kind`, `impact`, `intent`, `comment` |
+
+A failed call whose error can be fixed by Spicrawl says so in its error text, with the request id and the call to make. Report each problem once.
+
 ### Docs
 
 | Tool | What it does | Key parameters |
@@ -183,7 +191,7 @@ The schemas accept `ai_extract`, `stealth`, `extract_preset`, `premium_proxy`, `
 
 ### Partner tools
 
-For a platform that resells Spicrawl to its own users. A partner has one workspace per user, one balance of credits shared by all of them, and tiers: named sets of limits given to any number of users. These tools run that account. They are offered only to a partner key (a key with the `partner` scope; it cannot scrape). A partner key is offered these 15 tools and the three docs tools, 18 in all, and no scrape, batch, session or browser tool. Any other key gets the 28 standard tools, plus the webhook tools with a `webhooks` scope and the monitor tools with a `monitors` scope. The partner tools are not in the keyless tool list or the server card.
+For a platform that resells Spicrawl to its own users. A partner has one workspace per user, one balance of credits shared by all of them, and tiers: named sets of limits given to any number of users. These tools run that account. They are offered only to a partner key (a key with the `partner` scope; it cannot scrape). A partner key is offered these 15 tools and the three docs tools, 18 in all, and no scrape, batch, session or browser tool. Any other key gets the 29 standard tools, plus the webhook tools with a `webhooks` scope and the monitor tools with a `monitors` scope. The partner tools are not in the keyless tool list or the server card.
 
 **Creating a user is not available here.** The call that creates a user's workspace returns that user's API key in plain text, and that key must not pass through an assistant's transcript. Create users from your own server with `PUT /v1/partner/workspaces/{external_user_id}`, as the [partner API reference](https://docs.spicrawl.com/agents/mcp) describes.
 

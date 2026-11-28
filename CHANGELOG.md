@@ -3,6 +3,12 @@
 All notable changes to `@spicrawl/mcp` are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.4.0 — Feedback — 2026-11-28
+
+- **Added:** `spicrawl_feedback` reports a request that failed in a way the agent could not fix, or returned wrong or missing content. Free. A thumbs-down on a charged request refunds its credits, up to a daily cap per account. Offered to every standard key, not to a partner key or the ChatGPT endpoint.
+- **Added:** a failed call that Spicrawl can fix carries its request id in the error text, with the call to make to report it. Every failed call's error text names its request id.
+- **Added:** the server tells the client at initialize when to report a failed call.
+
 ## 0.3.1 — Brand, webhooks and monitors — 2026-11-25
 
 - **Added:** `spicrawl_brand` returns a site's identity, logo links, icons, colours, fonts, images, video links and socials from one rendered page. Links only, nothing downloaded. Billed like a JavaScript-rendered scrape (3 credits typically); a failed call costs 0. It is offered to every standard key.

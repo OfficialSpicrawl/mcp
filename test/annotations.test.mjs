@@ -69,6 +69,8 @@ const TOOLS = {
   spicrawl_docs_search: ["Search the Spicrawl docs", true, false, true],
   spicrawl_docs_read: ["Read a Spicrawl docs page", true, false, true],
   spicrawl_docs_index: ["List the Spicrawl docs", true, false, true],
+  // Records a report about one request; repeating it changes nothing (already reported).
+  spicrawl_feedback: ["Report a Spicrawl problem", false, false, false],
 };
 
 const BROWSER = "spicrawl_browser_connect_url";
@@ -180,8 +182,8 @@ function descriptions(schema, out = []) {
 const hints = (t) => [t.title, t.annotations.readOnlyHint, t.annotations.destructiveHint, t.annotations.openWorldHint];
 
 describe("tool annotations and titles", () => {
-  test("the table lists exactly the 28 registered tools", () => {
-    assert.equal(Object.keys(TOOLS).length, 28);
+  test("the table lists exactly the 29 registered tools", () => {
+    assert.equal(Object.keys(TOOLS).length, 29);
     assert.deepEqual(tools.map((t) => t.name).sort(), Object.keys(TOOLS).sort());
   });
 
@@ -383,8 +385,8 @@ describe("partner profile tool annotations", () => {
     assert.deepEqual(destructive, ["spicrawl_partner_give_credits", "spicrawl_partner_tier_delete", "spicrawl_partner_user_suspend"]);
   });
 
-  test("the standard listing keeps exactly its 28 tools, and no partner tool is in it", () => {
-    assert.equal(tools.length, 28);
+  test("the standard listing keeps exactly its 29 tools, and no partner tool is in it", () => {
+    assert.equal(tools.length, 29);
     assert.deepEqual(tools.filter((t) => t.name.startsWith("spicrawl_partner_")), []);
   });
 });
@@ -393,8 +395,8 @@ describe("webhook and monitor tool annotations (key with both scopes)", () => {
   const SCOPED = { ...WEBHOOK_TOOLS, ...MONITOR_TOOLS };
   const scoped = () => scopedTools.filter((t) => t.name in SCOPED);
 
-  test("a key with both scopes is offered the 28 standard tools plus every webhook and monitor tool", () => {
-    assert.equal(scopedTools.length, 28 + Object.keys(SCOPED).length);
+  test("a key with both scopes is offered the 29 standard tools plus every webhook and monitor tool", () => {
+    assert.equal(scopedTools.length, 29 + Object.keys(SCOPED).length);
     assert.deepEqual(scoped().map((t) => t.name).sort(), Object.keys(SCOPED).sort());
   });
 

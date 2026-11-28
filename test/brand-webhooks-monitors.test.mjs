@@ -66,24 +66,24 @@ describe("which tools each key scope is offered", () => {
   test("no scopes: brand is present, no webhook or monitor tool", async () => {
     const n = await names(clients.plain);
     assert.ok(n.includes("spicrawl_brand"));
-    assert.equal(n.length, 28);
+    assert.equal(n.length, 29);
     for (const t of [...WEBHOOK_TOOLS, ...MONITOR_TOOLS]) assert.ok(!n.includes(t), t);
   });
 
   test("the webhooks scope adds exactly the webhook tools", async () => {
     const n = await names(clients.webhooks);
     assert.deepEqual(n.filter((t) => /webhook|monitor/.test(t)), [...WEBHOOK_TOOLS].sort());
-    assert.equal(n.length, 28 + WEBHOOK_TOOLS.length);
+    assert.equal(n.length, 29 + WEBHOOK_TOOLS.length);
   });
 
   test("the monitors scope adds exactly the monitor tools", async () => {
     const n = await names(clients.monitors);
     assert.deepEqual(n.filter((t) => /webhook|monitor/.test(t)), [...MONITOR_TOOLS].sort());
-    assert.equal(n.length, 28 + MONITOR_TOOLS.length);
+    assert.equal(n.length, 29 + MONITOR_TOOLS.length);
   });
 
   test("both scopes add both groups", async () => {
-    assert.equal((await names(clients.both)).length, 28 + 16);
+    assert.equal((await names(clients.both)).length, 29 + 16);
   });
 
   test("a scope-gated tool is refused on a key without the scope, without reaching the API", async () => {
@@ -97,7 +97,7 @@ describe("which tools each key scope is offered", () => {
     const card = await (await fetch(`${mcp.base}/.well-known/mcp/server-card.json`)).json();
     const keyless = JSON.parse((await rawPost(mcp.mcpURL, { body: TOOLS_LIST_BODY })).text).result.tools;
     assert.deepEqual(keyless, card.tools);
-    assert.equal(card.tools.length, 28);
+    assert.equal(card.tools.length, 29);
     assert.ok(card.tools.some((t) => t.name === "spicrawl_brand"));
     assert.deepEqual(card.tools.filter((t) => /webhook|monitor/.test(t.name)), []);
   });

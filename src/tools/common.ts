@@ -76,6 +76,7 @@ export async function run(
   fn: () => Promise<unknown>,
   attach?: (data: unknown) => Attached,
   argNames?: Record<string, string>,
+  showRequestId = true,
 ) {
   const rename = (text: string) => (argNames ? renameArgs(text, argNames) : text);
   try {
@@ -141,7 +142,7 @@ export async function run(
       err instanceof ILayerError
         ? `${err.code}: ${err.message}${err.retryable ? " (retryable — the same request may succeed on a retry)" : ""}${
             err.docUrl ? `\nSee ${err.docUrl}` : ""
-          }${hint && !err.message.includes(hint) ? `\nHint: ${hint}` : ""}`
+          }${hint && !err.message.includes(hint) ? `\nHint: ${hint}` : ""}${showRequestId ? requestIdLine(err) : ""}${feedbackHint(err)}`
         : err instanceof Error
           ? err.message
           : String(err);
@@ -150,6 +151,23 @@ export async function run(
       content: [{ type: "text" as const, text: rename(message) }],
     };
   }
+}
+
+/** The failed call's request id, unless the message already names it. */
+function requestIdLine(err: ILayerError): string {
+  return err.requestId && !err.message.includes(err.requestId) ? `\nRequest ID: ${err.requestId}` : "";
+}
+
+/**
+ * The reporting hint for a failure the API marks reportable (it carries feedback_url).
+ * Only a failure with a request id gets it, since the report needs that id.
+ */
+function feedbackHint(err: ILayerError): string {
+  if (!err.feedbackUrl || !err.requestId) return "";
+  return (
+    `\nReport this to Spicrawl so it gets fixed: call spicrawl_feedback with request_id "${err.requestId}" ` +
+    "and what you were trying to get (once per task; a charged request is refunded)."
+  );
 }
 
 function isString(v: unknown): v is string {

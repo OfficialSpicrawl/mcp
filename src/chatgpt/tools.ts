@@ -230,6 +230,8 @@ async function call(
     },
     undefined,
     argNames,
+    // The ChatGPT surface leaves request ids out of results and errors.
+    false,
   );
   if (!unauthorized) return result;
   ctx.onUpstreamUnauthorized();
