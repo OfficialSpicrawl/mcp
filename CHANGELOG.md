@@ -3,6 +3,11 @@
 All notable changes to `@spicrawl/mcp` are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.4.1 — Origin check and security headers — 2026-11-28
+
+- **Fixed:** the hosted MCP endpoint validates the `Origin` header, as the MCP transport spec requires against DNS rebinding. A request with no `Origin` (a server-to-server client) is served as before. A browser request is served only from an allowed origin: `http://localhost`, `http://127.0.0.1` and `http://[::1]` on any port, `https://claude.ai`, `https://chatgpt.com`, `https://chat.openai.com`, and `https://spicrawl.com` or any `https` subdomain of it. Any other origin gets `403` with a JSON-RPC error. Add origins with `SPICRAWL_MCP_ALLOWED_ORIGINS`; `*` turns the check off.
+- **Fixed:** every response carries `Strict-Transport-Security`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` and `Referrer-Policy: no-referrer`.
+
 ## 0.4.0 — Feedback — 2026-11-28
 
 - **Added:** `spicrawl_feedback` reports a request that failed in a way the agent could not fix, or returned wrong or missing content. Free. A thumbs-down on a charged request refunds its credits, up to a daily cap per account. Offered to every standard key, not to a partner key or the ChatGPT endpoint.

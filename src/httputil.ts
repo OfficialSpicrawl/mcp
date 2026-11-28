@@ -46,6 +46,29 @@ export function apiKeyFromRequest(req: IncomingMessage): string | null {
   return candidates.find((c): c is string => typeof c === "string" && KEY_RE.test(c)) ?? null;
 }
 
+/** Origins a browser may send to an MCP endpoint without any configuration. */
+const DEFAULT_ORIGINS = new Set(["https://claude.ai", "https://chatgpt.com", "https://chat.openai.com", "https://spicrawl.com"]);
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+/**
+ * Whether a request's `Origin` header may reach an MCP endpoint (MCP Streamable HTTP
+ * requires the check, against DNS rebinding). `extra` holds the exact origins added by
+ * configuration. The header must be a canonical origin: a path, a trailing slash or
+ * `null` fails, and hosts are compared whole, so `claude.ai.evil.com` never matches.
+ */
+export function originAllowed(origin: string, extra: ReadonlySet<string>): boolean {
+  let u: URL;
+  try {
+    u = new URL(origin);
+  } catch {
+    return false;
+  }
+  if (u.origin !== origin) return false;
+  if (DEFAULT_ORIGINS.has(origin) || extra.has(origin)) return true;
+  if (u.protocol === "http:" && LOCAL_HOSTS.has(u.hostname)) return true;
+  return u.protocol === "https:" && u.port === "" && (u.hostname === "spicrawl.com" || u.hostname.endsWith(".spicrawl.com"));
+}
+
 /**
  * Whether the request presented anything as a credential: a non-blank
  * `Authorization`, `x-api-key` or `api-key` header, well-formed or not. A caller

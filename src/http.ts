@@ -32,6 +32,8 @@
  *                     SPICRAWL_PUBLIC_BASE_URL / SPICRAWL_BASE_URL + /docs, then
  *                     https://docs.spicrawl.com (see docsBaseFromEnv)
  *   SPICRAWL_MCP_SESSION_IDLE_MS  idle session eviction, default 1800000 (30 min)
+ *   SPICRAWL_MCP_ALLOWED_ORIGINS  extra exact origins a browser may send to /mcp, comma-separated;
+ *                     "*" turns the Origin check off. The defaults are in httputil.ts (originAllowed)
  *   SPICRAWL_MCP_HIDE_UNAVAILABLE  1/true/yes/on lists only what works today: no
  *                     spicrawl_browser_connect_url, no argument marked "Coming soon"
  *                     (read when a session opens; restart to change it)
@@ -47,9 +49,9 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { isInitializeRequest, LATEST_PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS } from "@modelcontextprotocol/sdk/types.js";
 import { ILayerClient, USER_AGENT } from "./client.js";
 import { buildServer, isTruthy, SERVER_NAME, SERVER_VERSION } from "./server.js";
-import { apiKeyFromRequest, presentsCredentials, readJSON, rpcError } from "./httputil.js";
+import { apiKeyFromRequest, originAllowed, presentsCredentials, readJSON, rpcError } from "./httputil.js";
 import { chatgptConfigFromEnv, type ChatgptConfig } from "./chatgpt/oauth.js";
-import { chatgptRoutes } from "./chatgpt/http.js";
+import { CHATGPT_MCP_PATH, chatgptRoutes } from "./chatgpt/http.js";
 import { buildServerCard } from "./card.js";
 import { keyInfo, keyScopes, toolProfile } from "./profile.js";
 
@@ -302,8 +304,40 @@ async function handleCard(req: IncomingMessage, res: ServerResponse) {
   }
 }
 
+// Every response this server writes carries these, whichever route answers it.
+const SECURITY_HEADERS: Record<string, string> = {
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "no-referrer",
+};
+
+// SPICRAWL_MCP_ALLOWED_ORIGINS: exact origins added to the defaults; "*" turns the check off.
+const originConfig = (() => {
+  const extra = new Set<string>();
+  for (const item of (process.env.SPICRAWL_MCP_ALLOWED_ORIGINS || "").split(",")) {
+    const v = item.trim();
+    if (!v) continue;
+    if (v === "*") return { off: true, extra };
+    try {
+      const o = new URL(v).origin;
+      if (o === "null") throw new Error("opaque origin");
+      extra.add(o);
+    } catch {
+      log(`SPICRAWL_MCP_ALLOWED_ORIGINS: ignoring '${v}' (not an origin)`);
+    }
+  }
+  return { off: false, extra };
+})();
+
 const http = createServer((req, res) => {
+  for (const [k, v] of Object.entries(SECURITY_HEADERS)) res.setHeader(k, v);
   const path = (req.url || "/").split("?")[0];
+  // The MCP endpoints, all methods. A request with no Origin is a server-to-server client and passes.
+  const origin = req.headers.origin;
+  if ((path === "/mcp" || path === CHATGPT_MCP_PATH) && origin !== undefined && !originConfig.off && !originAllowed(origin, originConfig.extra)) {
+    return rpcError(res, 403, -32001, `Origin not allowed: ${origin}. Requests from a browser must come from an allowed origin.`);
+  }
   if (path === "/.well-known/mcp/server-card.json") {
     if (req.method === "GET" || req.method === "HEAD") void handleCard(req, res);
     else rpcError(res, 405, -32000, "Method not allowed", { Allow: "GET, HEAD" });
