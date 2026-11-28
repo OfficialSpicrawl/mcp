@@ -3,6 +3,10 @@
 All notable changes to `@spicrawl/mcp` are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.4.3 — Raw JSON page — 2026-11-28
+
+- **Fixed:** a raw scrape reply that is JSON (a request body to a JSON API) is returned as the page content instead of being read as the API envelope, which failed output validation.
+
 ## 0.4.2 — Raw body response — 2026-11-28
 
 - **Fixed:** `spicrawl_scrape` with a `body` and no `format` returns the raw response instead of failing with `ERR::EXTRACT::FAILED` on JSON APIs. `format` defaults to `html` when a `body` is sent, and to `markdown` otherwise.

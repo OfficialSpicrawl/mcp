@@ -306,7 +306,10 @@ function registerChatgptTools(server: ChatgptMcpServer, client: ILayerClient, ct
         ["scrape"],
         async () => {
           let headers: Headers | undefined;
-          const data = await client.request("POST", "/v1/scrape", params, { onHeaders: (h) => (headers = h) });
+          const data = await client.request("POST", "/v1/scrape", params, {
+            onHeaders: (h) => (headers = h),
+            rawContent: input.format !== "json",
+          });
           // A markdown, text or HTML body carries the site's status and the charge in headers.
           if (isObj(data) && headers) {
             const num = (name: string) => {
