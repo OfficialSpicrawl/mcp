@@ -160,6 +160,11 @@ export interface RequestOptions {
   onHeaders?: (headers: Headers) => void;
   /** Overrides the client's timeout for this call (the session's key check asks within 5 s). */
   timeoutMs?: number;
+  /**
+   * A scrape whose reply is the page itself (markdown, text, html): a completed scrape's body is
+   * never parsed, so a JSON page is content, not the API envelope. A platform problem still is.
+   */
+  rawContent?: boolean;
 }
 
 export class ILayerClient {
@@ -192,7 +197,7 @@ export class ILayerClient {
 
   /** POST /v1/scrape — retrieve, render, and extract one URL. */
   async scrape(params: Record<string, unknown>): Promise<unknown> {
-    return this.request("POST", "/v1/scrape", params);
+    return this.request("POST", "/v1/scrape", params, { rawContent: scrapeIsRaw(params) });
   }
 
   /** Any REST call. Tools for newer endpoints use this directly. */
@@ -239,13 +244,18 @@ export class ILayerClient {
 
     const text = await response.text();
     let parsed: unknown;
-    try {
-      parsed = text ? JSON.parse(text) : {};
-    } catch {
-      // Not JSON: a scrape body (markdown/text/html) — or, on an error, a
-      // gateway's page, which the check below still reports as a failure.
-      parsed =
-        response.ok || response.headers.get("x-engine") !== null ? { content: text, [TEXT_BODY]: true } : { detail: text };
+    if (options.rawContent && text && response.headers.get("x-engine") !== null && !isPlatformProblem(response, text)) {
+      // A completed scrape's page, whatever it looks like (a JSON API's reply included).
+      parsed = { content: text, [TEXT_BODY]: true };
+    } else {
+      try {
+        parsed = text ? JSON.parse(text) : {};
+      } catch {
+        // Not JSON: a scrape body (markdown/text/html) — or, on an error, a
+        // gateway's page, which the check below still reports as a failure.
+        parsed =
+          response.ok || response.headers.get("x-engine") !== null ? { content: text, [TEXT_BODY]: true } : { detail: text };
+      }
     }
     // X-Note advice travels beside the body. A body's own `notes` wins; otherwise the
     // header's note is put on the object, so an empty refusal still explains itself.
@@ -273,6 +283,29 @@ export class ILayerClient {
       );
     }
     return parsed;
+  }
+}
+
+/** Envelope-forcing options: with any of these set, the API answers with the JSON envelope whatever the format. */
+const ENVELOPE_KEYS = ["extract", "ai_extract", "autoparse", "links", "screenshot", "network_capture", "extract_preset"];
+
+/** True when a scrape's reply is the page itself: a non-json format and nothing that forces the envelope. */
+export function scrapeIsRaw(params: Record<string, unknown>): boolean {
+  const f = params.response_format;
+  return f !== undefined && f !== "json" && !ENVELOPE_KEYS.some((k) => params[k]);
+}
+
+/**
+ * A platform problem: an RFC 7807 body (application/problem+json), or JSON whose `code`
+ * is an `ERR::` code. Only these are the API's envelope; any other reply is the page.
+ */
+function isPlatformProblem(response: Response, text: string): boolean {
+  if (mediaType(response) === "application/problem+json") return true;
+  try {
+    const code = (JSON.parse(text) as Problem | null)?.code;
+    return typeof code === "string" && code.startsWith("ERR::");
+  } catch {
+    return false;
   }
 }
 

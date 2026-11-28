@@ -13,7 +13,7 @@ import { z } from "zod";
 import { ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import type { RegisteredTool, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AnySchema, ZodRawShapeCompat } from "@modelcontextprotocol/sdk/server/zod-compat.js";
-import { ILayerClient, ILayerError, TEXT_BODY } from "../client.js";
+import { ILayerClient, ILayerError, TEXT_BODY, scrapeIsRaw } from "../client.js";
 import { SERVER_NAME, SERVER_VERSION, SpicrawlMcpServer, type RequiredToolAnnotations } from "../server.js";
 import { API_ARG_NAMES, run } from "../tools/common.js";
 import { batchResults, jobPath } from "../tools/batch.js";
@@ -306,7 +306,10 @@ function registerChatgptTools(server: ChatgptMcpServer, client: ILayerClient, ct
         ["scrape"],
         async () => {
           let headers: Headers | undefined;
-          const data = await client.request("POST", "/v1/scrape", params, { onHeaders: (h) => (headers = h) });
+          const data = await client.request("POST", "/v1/scrape", params, {
+            onHeaders: (h) => (headers = h),
+            rawContent: scrapeIsRaw(params),
+          });
           // A markdown, text or HTML body carries the site's status and the charge in headers.
           if (isObj(data) && headers) {
             const num = (name: string) => {

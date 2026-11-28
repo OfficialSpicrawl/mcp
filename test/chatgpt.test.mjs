@@ -398,6 +398,12 @@ describe("the restricted tool profile", () => {
     assert.doesNotMatch(JSON.stringify(r), /01TESTRAW/);
   });
 
+  test("sanitizer: a JSON page in a raw scrape is the content text", async () => {
+    const r = await callTool("spicrawl_scrape", { url: "https://jsonpage.test/", format: "html" });
+    assert.match(r.result.structuredContent.content, /"json":\{"q":1\}/);
+    assert.equal(r.result.structuredContent.data, undefined);
+  });
+
   test("sanitizer: a JSON envelope loses request ids, engine, proxy and diagnostics", async () => {
     const r = await callTool("spicrawl_scrape", { url: "https://envelope.test/", format: "json" });
     const out = r.result.structuredContent;
